@@ -1,0 +1,315 @@
+# Implementation Plan: Social Worker Platform
+
+## Overview
+
+このプランは、Next.js (JavaScript) フロントエンド、Gin (Go) バックエンド、PostgreSQLデータベースを使用したソーシャルワーカープラットフォームの実装手順を定義します。各タスクは段階的に構築され、コア機能を早期に検証します。
+
+## Tasks
+
+- [-] 1. プロジェクト初期化とGit設定
+  - プロジェクトルートディレクトリ構造を作成
+  - Gitリポジトリを初期化
+  - .gitignoreファイルを作成（Go、Node.js、環境変数ファイルを除外）
+  - README.mdを作成（プロジェクト概要、セットアップ手順、技術スタック）
+  - _Requirements: 全体_
+
+- [ ] 2. データベースセットアップ
+  - [ ] 2.1 PostgreSQL接続設定とマイグレーションツール
+    - docker-compose.ymlでPostgreSQLコンテナを定義
+    - データベース接続設定を環境変数で管理
+    - マイグレーションツール（golang-migrate）をセットアップ
+    - _Requirements: 6.1, 6.3_
+  - [ ] 2.2 データベーススキーマ作成
+    - usersテーブルのマイグレーションファイルを作成
+    - hospitalsテーブルのマイグレーションファイルを作成
+    - facilitiesテーブルのマイグレーションファイルを作成
+    - documentsテーブルのマイグレーションファイルを作成
+    - インデックスを追加
+    - _Requirements: 6.1, 6.4_
+  - [ ] 2.3 データベーススキーマのプロパティテスト
+    - **Property 28: Referential integrity is enforced**
+    - **Validates: Requirements 6.4**
+
+- [ ] 3. バックエンド基盤構築
+  - [ ] 3.1 Goプロジェクト初期化
+    - go.modファイルを作成
+    - 必要な依存関係をインストール（Gin、pq、jwt-go）
+    - ディレクトリ構造を作成（handlers、models、middleware、config）
+    - _Requirements: 7.1_
+  - [ ] 3.2 データベース接続とモデル
+    - データベース接続プールを実装
+    - Userモデルを実装（CRUD操作）
+    - Hospitalモデルを実装（CRUD操作）
+    - Facilityモデルを実装（CRUD操作）
+    - Documentモデルを実装（CRUD操作）
+    - _Requirements: 6.1, 6.3_
+  - [ ] 3.3 データモデルのプロパティテスト
+    - **Property 26: Data persistence round trip**
+    - **Validates: Requirements 6.1**
+  - [ ] 3.4 データベースエラーハンドリングのユニットテスト
+    - データベース接続エラーのテスト
+    - クエリエラーのテスト
+    - _Requirements: 6.3_
+
+- [ ] 4. 認証システム実装
+  - [ ] 4.1 パスワードハッシュとJWT生成
+    - パスワードハッシュ関数を実装（bcrypt）
+    - JWT生成と検証関数を実装
+    - _Requirements: 8.1, 8.2_
+  - [ ] 4.2 パスワードセキュリティのプロパティテスト
+    - **Property 32: Passwords are encrypted**
+    - **Validates: Requirements 8.1**
+  - [ ] 4.3 JWTトークンのプロパティテスト
+    - **Property 33: Session tokens are secure**
+    - **Validates: Requirements 8.2**
+  - [ ] 4.2 認証ハンドラー実装
+    - ログインエンドポイント（POST /api/auth/login）を実装
+    - ログアウトエンドポイント（POST /api/auth/logout）を実装
+    - 現在のユーザー取得エンドポイント（GET /api/auth/me）を実装
+    - _Requirements: 1.2, 1.3, 1.4_
+  - [ ] 4.5 認証フローのプロパティテスト
+    - **Property 2: Valid credentials authenticate successfully**
+    - **Property 3: Invalid credentials are rejected**
+    - **Property 4: Logout invalidates session**
+    - **Validates: Requirements 1.2, 1.3, 1.4**
+  - [ ] 4.6 認証エラーケースのユニットテスト
+    - 無効なトークン形式のテスト
+    - 期限切れトークンのテスト
+    - _Requirements: 1.6_
+
+- [ ] 5. 認証・認可ミドルウェア実装
+  - [ ] 5.1 ミドルウェア実装
+    - 認証ミドルウェア（JWT検証）を実装
+    - 認可ミドルウェア（ロールベースアクセス制御）を実装
+    - CORSミドルウェアを実装
+    - ロギングミドルウェアを実装
+    - エラーハンドリングミドルウェアを実装
+    - _Requirements: 1.5, 7.3, 7.5_
+  - [ ] 5.2 認可のプロパティテスト
+    - **Property 5: Role-based access control**
+    - **Property 6: Expired sessions require re-authentication**
+    - **Validates: Requirements 1.5, 1.6**
+
+- [ ] 6. チェックポイント - バックエンド基盤の動作確認
+  - すべてのテストが通ることを確認
+  - データベース接続と認証フローが正常に動作することを確認
+  - 質問があればユーザーに確認
+
+- [ ] 7. 施設管理API実装
+  - [ ] 7.1 施設エンドポイント実装
+    - 施設作成エンドポイント（POST /api/facilities）を実装
+    - 施設一覧・検索エンドポイント（GET /api/facilities）を実装
+    - 施設詳細取得エンドポイント（GET /api/facilities/:id）を実装
+    - 施設更新エンドポイント（PUT /api/facilities/:id）を実装
+    - 自施設情報取得エンドポイント（GET /api/facilities/me）を実装
+    - _Requirements: 2.1, 2.2, 2.5, 3.1, 3.3_
+  - [ ] 7.2 施設管理のプロパティテスト
+    - **Property 7: Facility creation stores all fields**
+    - **Property 8: Facility updates are persisted**
+    - **Property 11: Facility owners can view their data**
+    - **Validates: Requirements 2.1, 2.2, 2.5**
+  - [ ] 7.3 施設検索のプロパティテスト
+    - **Property 12: Search returns matching facilities**
+    - **Property 13: Filtering works correctly**
+    - **Property 14: Facility details contain all information**
+    - **Validates: Requirements 3.1, 3.2, 3.3**
+  - [ ] 7.4 施設認可のプロパティテスト
+    - **Property 9: Unauthorized facility modification is prevented**
+    - **Property 15: Facility users cannot search**
+    - **Validates: Requirements 2.3, 3.4**
+  - [ ] 7.5 施設バリデーションのユニットテスト
+    - 必須フィールドが空の場合のテスト
+    - 無効なデータ形式のテスト
+    - _Requirements: 2.4_
+
+- [ ] 8. 書類管理API実装
+  - [ ] 8.1 書類エンドポイント実装
+    - 書類アップロードエンドポイント（POST /api/documents）を実装
+    - 書類一覧取得エンドポイント（GET /api/documents）を実装
+    - 書類詳細取得エンドポイント（GET /api/documents/:id）を実装
+    - ファイルストレージ処理を実装（ローカルまたはS3）
+    - _Requirements: 4.1, 4.2, 4.4_
+  - [ ] 8.2 書類管理のプロパティテスト
+    - **Property 16: Document sending creates record**
+    - **Property 17: Users can view their documents**
+    - **Property 19: Document metadata is complete**
+    - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.6**
+  - [ ] 8.3 書類認可のプロパティテスト
+    - **Property 18: Document access is restricted**
+    - **Validates: Requirements 4.5**
+
+- [ ] 9. 管理者API実装
+  - [ ] 9.1 管理者エンドポイント実装
+    - 病院アカウント作成エンドポイント（POST /api/admin/hospitals）を実装
+    - 病院一覧取得エンドポイント（GET /api/admin/hospitals）を実装
+    - 病院更新エンドポイント（PUT /api/admin/hospitals/:id）を実装
+    - 病院削除エンドポイント（DELETE /api/admin/hospitals/:id）を実装
+    - 施設アカウント作成エンドポイント（POST /api/admin/facilities）を実装
+    - 施設一覧取得エンドポイント（GET /api/admin/facilities）を実装
+    - 施設更新エンドポイント（PUT /api/admin/facilities/:id）を実装
+    - 施設削除エンドポイント（DELETE /api/admin/facilities/:id）を実装
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - [ ] 9.2 管理者機能のプロパティテスト
+    - **Property 20: Admin creates hospital accounts**
+    - **Property 21: Admin creates facility accounts**
+    - **Property 22: Admin updates are persisted**
+    - **Property 23: Account deletion marks inactive**
+    - **Property 24: Admin can view all entities**
+    - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5**
+  - [ ] 9.3 管理者認可のプロパティテスト
+    - **Property 25: Non-admins cannot access admin functions**
+    - **Validates: Requirements 5.6**
+
+- [ ] 10. バックエンドAPI共通機能
+  - [ ] 10.1 入力バリデーションとセキュリティ
+    - 入力サニタイゼーション関数を実装
+    - レート制限ミドルウェアを実装
+    - _Requirements: 7.4, 8.3, 8.5_
+  - [ ] 10.2 APIレスポンス形式のプロパティテスト
+    - **Property 29: API responses are valid JSON**
+    - **Property 30: Failed requests return proper status codes**
+    - **Property 31: Invalid input is rejected**
+    - **Validates: Requirements 7.2, 7.3, 7.4**
+  - [ ] 10.3 セキュリティのプロパティテスト
+    - **Property 34: Malicious input is sanitized**
+    - **Property 35: Rate limiting prevents abuse**
+    - **Validates: Requirements 8.3, 8.5**
+
+- [ ] 11. チェックポイント - バックエンドAPI完成確認
+  - すべてのテストが通ることを確認
+  - すべてのAPIエンドポイントが正常に動作することを確認
+  - Postmanやcurlでエンドポイントをテスト
+  - 質問があればユーザーに確認
+
+- [ ] 12. フロントエンド初期化
+  - [ ] 12.1 Next.jsプロジェクト作成
+    - Next.jsプロジェクトを作成（JavaScript）
+    - 必要な依存関係をインストール（axios、react-hook-form）
+    - ディレクトリ構造を作成（components、pages、lib、styles）
+    - _Requirements: 7.1_
+  - [ ] 12.2 API通信ライブラリ
+    - APIクライアントを実装（axios設定、認証ヘッダー）
+    - エラーハンドリングを実装
+    - _Requirements: 7.1, 7.3_
+
+- [ ] 13. 認証UI実装
+  - [ ] 13.1 ログインページ
+    - ログインフォームコンポーネントを実装
+    - ログイン処理を実装（JWT保存）
+    - エラー表示を実装
+    - _Requirements: 1.2, 1.3_
+  - [ ] 13.2 認証コンテキスト
+    - 認証状態管理（React Context）を実装
+    - ログアウト機能を実装
+    - 保護されたルートコンポーネントを実装
+    - _Requirements: 1.4, 1.5_
+  - [ ] 13.3 認証UIのユニットテスト
+    - ログインフォームのテスト
+    - 認証コンテキストのテスト
+    - _Requirements: 1.2, 1.3, 1.4_
+
+- [ ] 14. 施設ユーザーUI実装
+  - [ ] 14.1 施設情報登録・編集フォーム
+    - 施設情報フォームコンポーネントを実装
+    - フォームバリデーションを実装
+    - 施設情報の作成・更新処理を実装
+    - _Requirements: 2.1, 2.2_
+  - [ ] 14.2 施設ダッシュボード
+    - 施設ダッシュボードページを実装
+    - 自施設情報表示を実装
+    - _Requirements: 2.5_
+  - [ ] 14.3 施設UIのユニットテスト
+    - フォームバリデーションのテスト
+    - 施設情報表示のテスト
+    - _Requirements: 2.1, 2.2, 2.5_
+
+- [ ] 15. 病院ユーザーUI実装
+  - [ ] 15.1 施設検索ページ
+    - 施設検索フォームコンポーネントを実装
+    - フィルター機能を実装（病床数、受け入れ条件、場所）
+    - 検索結果一覧表示を実装
+    - _Requirements: 3.1, 3.2_
+  - [ ] 15.2 施設詳細ページ
+    - 施設詳細表示コンポーネントを実装
+    - _Requirements: 3.3_
+  - [ ] 15.3 病院ダッシュボード
+    - 病院ダッシュボードページを実装
+    - _Requirements: 3.1_
+  - [ ] 15.4 病院UIのユニットテスト
+    - 検索フォームのテスト
+    - フィルター機能のテスト
+    - _Requirements: 3.1, 3.2, 3.3_
+
+- [ ] 16. 書類管理UI実装
+  - [ ] 16.1 書類アップロードコンポーネント
+    - ファイルアップロードフォームを実装
+    - 送信先選択機能を実装
+    - アップロード処理を実装
+    - _Requirements: 4.1, 4.2_
+  - [ ] 16.2 書類一覧・詳細表示
+    - 書類一覧コンポーネントを実装
+    - 書類詳細表示コンポーネントを実装
+    - _Requirements: 4.4_
+  - [ ] 16.3 書類UIのユニットテスト
+    - ファイルアップロードのテスト
+    - 書類一覧表示のテスト
+    - _Requirements: 4.1, 4.2, 4.4_
+
+- [ ] 17. 管理者UI実装
+  - [ ] 17.1 アカウント管理ページ
+    - 病院アカウント一覧・作成・編集・削除UIを実装
+    - 施設アカウント一覧・作成・編集・削除UIを実装
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - [ ] 17.2 管理者ダッシュボード
+    - 管理者ダッシュボードページを実装
+    - システム概要表示を実装
+    - _Requirements: 5.5_
+  - [ ] 17.3 管理者UIのユニットテスト
+    - アカウント管理フォームのテスト
+    - 一覧表示のテスト
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+
+- [ ] 18. チェックポイント - フロントエンド完成確認
+  - すべてのテストが通ることを確認
+  - すべてのページが正常に表示されることを確認
+  - ブラウザで各機能をテスト
+  - 質問があればユーザーに確認
+
+- [ ] 19. 統合とデプロイ準備
+  - [ ] 19.1 環境設定ファイル
+    - .env.exampleファイルを作成（フロントエンド・バックエンド）
+    - 環境変数の説明をREADMEに追加
+    - _Requirements: 全体_
+  - [ ] 19.2 Docker設定
+    - Dockerfileを作成（フロントエンド・バックエンド）
+    - docker-compose.ymlを更新（全サービス統合）
+    - _Requirements: 全体_
+  - [ ] 19.3 統合テスト
+    - エンドツーエンドフローのテスト
+    - 認証フローの統合テスト
+    - _Requirements: 全体_
+
+- [ ] 20. ドキュメント整備
+  - [ ] 20.1 README更新
+    - セットアップ手順を詳細化
+    - API仕様書へのリンクを追加
+    - トラブルシューティングセクションを追加
+    - _Requirements: 全体_
+  - [ ] 20.2 API仕様書
+    - API仕様書を作成（エンドポイント一覧、リクエスト・レスポンス例）
+    - _Requirements: 7.1, 7.2_
+
+- [ ] 21. 最終チェックポイント
+  - すべてのテストが通ることを確認
+  - docker-composeで全サービスが起動することを確認
+  - 各ユーザーロールで主要機能が動作することを確認
+  - コード全体をリファクタリング（必要に応じて）
+  - 質問があればユーザーに確認
+
+## Notes
+
+- すべてのタスクは必須です（包括的なテストカバレッジ）
+- 各タスクは要件への参照を含み、トレーサビリティを確保します
+- チェックポイントで段階的な検証を行います
+- プロパティテストは普遍的な正確性プロパティを検証します
+- ユニットテストは特定の例とエッジケースを検証します
