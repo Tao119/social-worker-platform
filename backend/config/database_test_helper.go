@@ -27,6 +27,15 @@ func SetupTestDatabase(t *testing.T) *sql.DB {
 		t.Fatalf("Failed to ping test database: %v", err)
 	}
 
+	// Truncate all tables before test to ensure clean state
+	tables := []string{"documents", "facilities", "hospitals", "users"}
+	for _, table := range tables {
+		_, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+		if err != nil {
+			t.Logf("Warning: Failed to truncate table %s: %v", table, err)
+		}
+	}
+
 	return db
 }
 
