@@ -58,6 +58,28 @@
 - Node.js 18以上
 - Docker & Docker Compose
 - PostgreSQL 15以上（ローカル開発の場合）
+- golang-migrate CLI
+
+#### golang-migrateのインストール
+
+macOS:
+
+```bash
+brew install golang-migrate
+```
+
+Linux:
+
+```bash
+curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz | tar xvz
+sudo mv migrate /usr/local/bin/
+```
+
+Windows:
+
+```bash
+scoop install migrate
+```
 
 ### 1. リポジトリのクローン
 
