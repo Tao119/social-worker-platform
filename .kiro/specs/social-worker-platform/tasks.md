@@ -26,12 +26,12 @@
     - documentsテーブルのマイグレーションファイルを作成
     - インデックスを追加
     - _Requirements: 6.1, 6.4_
-  - [-] 2.3 データベーススキーマのプロパティテスト
+  - [x] 2.3 データベーススキーマのプロパティテスト
     - **Property 28: Referential integrity is enforced**
     - **Validates: Requirements 6.4**
 
 - [ ] 3. バックエンド基盤構築
-  - [ ] 3.1 Goプロジェクト初期化
+  - [-] 3.1 Goプロジェクト初期化
     - go.modファイルを作成
     - 必要な依存関係をインストール（Gin、pq、jwt-go）
     - ディレクトリ構造を作成（handlers、models、middleware、config）
