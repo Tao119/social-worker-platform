@@ -36,14 +36,14 @@
     - 必要な依存関係をインストール（Gin、pq、jwt-go）
     - ディレクトリ構造を作成（handlers、models、middleware、config）
     - _Requirements: 7.1_
-  - [-] 3.2 データベース接続とモデル
+  - [x] 3.2 データベース接続とモデル
     - データベース接続プールを実装
     - Userモデルを実装（CRUD操作）
     - Hospitalモデルを実装（CRUD操作）
     - Facilityモデルを実装（CRUD操作）
     - Documentモデルを実装（CRUD操作）
     - _Requirements: 6.1, 6.3_
-  - [ ] 3.3 データモデルのプロパティテスト
+  - [x] 3.3 データモデルのプロパティテスト
     - **Property 26: Data persistence round trip**
     - **Validates: Requirements 6.1**
   - [ ] 3.4 データベースエラーハンドリングのユニットテスト

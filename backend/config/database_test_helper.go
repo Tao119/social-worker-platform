@@ -3,7 +3,6 @@ package config
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"testing"
 
 	_ "github.com/lib/pq"
@@ -40,11 +39,4 @@ func TeardownTestDatabase(t *testing.T, db *sql.DB) {
 		}
 	}
 	db.Close()
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
