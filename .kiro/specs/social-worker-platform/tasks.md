@@ -19,14 +19,14 @@
     - データベース接続設定を環境変数で管理
     - マイグレーションツール（golang-migrate）をセットアップ
     - _Requirements: 6.1, 6.3_
-  - [-] 2.2 データベーススキーマ作成
+  - [x] 2.2 データベーススキーマ作成
     - usersテーブルのマイグレーションファイルを作成
     - hospitalsテーブルのマイグレーションファイルを作成
     - facilitiesテーブルのマイグレーションファイルを作成
     - documentsテーブルのマイグレーションファイルを作成
     - インデックスを追加
     - _Requirements: 6.1, 6.4_
-  - [ ] 2.3 データベーススキーマのプロパティテスト
+  - [-] 2.3 データベーススキーマのプロパティテスト
     - **Property 28: Referential integrity is enforced**
     - **Validates: Requirements 6.4**
 

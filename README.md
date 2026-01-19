@@ -94,9 +94,15 @@ cd social-worker-platform
 # Docker Composeでデータベースを起動
 docker-compose up -d postgres
 
-# マイグレーションの実行
+# データベースが起動するまで待機
+sleep 10
+
+# マイグレーションの実行（本番用データベース）
 cd backend
 make migrate-up
+
+# テスト用データベースのマイグレーション
+DB_NAME=social_worker_platform_test make migrate-up
 ```
 
 ### 3. バックエンドの起動
@@ -138,11 +144,15 @@ npm run dev
 ```bash
 cd backend
 
-# テストの実行
+# テストの実行（データベースが必要）
+# 事前にdocker-compose up -d postgresとマイグレーションを実行してください
 go test ./...
 
 # プロパティベーステストの実行
 go test -v ./... -run Property
+
+# 短時間テストのみ実行（データベース不要）
+go test -short ./...
 
 # コードフォーマット
 go fmt ./...
