@@ -46,6 +46,7 @@
   - [x] 3.3 データモデルのプロパティテスト
     - **Property 26: Data persistence round trip**
     - **Validates: Requirements 6.1**
+    - Note: Tests share a single test database; consider isolating test databases for parallel execution to avoid flakiness
   - [ ] 3.4 データベースエラーハンドリングのユニットテスト
     - データベース接続エラーのテスト
     - クエリエラーのテスト
