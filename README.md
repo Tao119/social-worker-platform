@@ -316,3 +316,108 @@ The backend API has been fully implemented with the following features:
 - Frontend implementation with Next.js
 - Integration testing
 - Deployment configuration
+
+## Quick Start (Backend Only)
+
+### Prerequisites
+
+- Docker and Docker Compose
+- Go 1.21+
+- PostgreSQL client (for migrations)
+
+### Starting the Backend
+
+1. **Start PostgreSQL with Docker:**
+
+```bash
+docker compose up -d
+```
+
+2. **Run database migrations:**
+
+```bash
+cd backend
+make migrate-up
+```
+
+3. **Start the backend server:**
+
+```bash
+cd backend
+go run cmd/server/main.go
+```
+
+Or use the convenience script:
+
+```bash
+./start-backend.sh
+```
+
+The API will be available at `http://localhost:8080`
+
+### API Endpoints
+
+#### Authentication
+
+- `POST /api/auth/login` - User login
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/me` - Get current user
+
+#### Facilities (Hospital users)
+
+- `GET /api/facilities` - List/search facilities
+- `GET /api/facilities/:id` - Get facility details
+
+#### Facilities (Facility users)
+
+- `POST /api/facilities` - Create facility
+- `PUT /api/facilities/:id` - Update facility
+- `GET /api/facilities/me` - Get own facility
+
+#### Documents
+
+- `POST /api/documents` - Upload document
+- `GET /api/documents` - List documents
+- `GET /api/documents/:id` - Get document details
+- `GET /api/documents/:id/download` - Download document
+
+#### Admin
+
+- `POST /api/admin/hospitals` - Create hospital account
+- `GET /api/admin/hospitals` - List hospitals
+- `PUT /api/admin/hospitals/:id` - Update hospital
+- `DELETE /api/admin/hospitals/:id` - Delete hospital
+- `POST /api/admin/facilities` - Create facility account
+- `GET /api/admin/facilities` - List facilities
+- `PUT /api/admin/facilities/:id` - Update facility
+- `DELETE /api/admin/facilities/:id` - Delete facility
+
+### Testing the API
+
+You can test the API using curl or Postman. Example:
+
+```bash
+# Create admin user (you'll need to do this directly in the database first)
+# Then login:
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"password123"}'
+```
+
+## Current Limitations
+
+⚠️ **Frontend is not implemented yet.** Only the backend API is available.
+
+To use the system, you'll need to:
+
+1. Create users directly in the database or use the admin API
+2. Test endpoints using curl, Postman, or similar tools
+3. Wait for frontend implementation (Next.js UI)
+
+## Development Status
+
+- ✅ Backend API: Complete
+- ❌ Frontend UI: Not started
+- ✅ Database: Complete with migrations
+- ✅ Authentication: Complete with JWT
+- ✅ Testing: Comprehensive unit and property tests

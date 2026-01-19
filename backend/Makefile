@@ -39,3 +39,29 @@ test-property:
 
 run:
 	go run cmd/main.go
+
+
+.PHONY: create-admin
+create-admin:
+	@echo "Creating admin user..."
+	@go run cmd/create-admin/main.go
+
+.PHONY: run
+run:
+	@echo "Starting server..."
+	@go run cmd/server/main.go
+
+.PHONY: build
+build:
+	@echo "Building server..."
+	@go build -o bin/server cmd/server/main.go
+
+.PHONY: test
+test:
+	@echo "Running tests..."
+	@JWT_SECRET=test-secret go test -v ./...
+
+.PHONY: test-short
+test-short:
+	@echo "Running short tests (skipping property tests)..."
+	@JWT_SECRET=test-secret go test -short -v ./...
