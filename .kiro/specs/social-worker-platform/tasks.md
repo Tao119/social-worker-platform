@@ -161,7 +161,7 @@
     - **Property 25: Non-admins cannot access admin functions**
     - **Validates: Requirements 5.6**
 
-- [ ] 10. バックエンドAPI共通機能
+- [x] 10. バックエンドAPI共通機能
   - [ ] 10.1 入力バリデーションとセキュリティ
     - 入力サニタイゼーション関数を実装
     - レート制限ミドルウェアを実装
