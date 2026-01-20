@@ -9,6 +9,10 @@ import (
 )
 
 func SetupTestDatabase(t *testing.T) *sql.DB {
+	if testing.Short() {
+		t.Skip("Skipping database test in short mode")
+	}
+
 	config := &DatabaseConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
 		Port:     getEnv("DB_PORT", "5432"),

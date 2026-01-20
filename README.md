@@ -196,7 +196,15 @@ make migrate-down
 
 ## API仕様
 
-詳細なAPI仕様は [API Documentation](./docs/api.md) を参照してください。
+詳細なAPI仕様は [API.md](./API.md) を参照してください。
+
+完全なAPIドキュメントには以下が含まれます：
+
+- 全エンドポイントの詳細仕様
+- リクエスト/レスポンスの例
+- 認証フロー
+- エラーハンドリング
+- レート制限の詳細
 
 ### 主要エンドポイント
 
@@ -234,6 +242,8 @@ make migrate-down
 
 ### データベース接続エラー
 
+データベースに接続できない場合：
+
 ```bash
 # PostgreSQLコンテナの状態確認
 docker-compose ps
@@ -243,25 +253,176 @@ docker-compose logs postgres
 
 # コンテナの再起動
 docker-compose restart postgres
+
+# データベースが起動するまで待機
+sleep 10
+```
+
+環境変数が正しく設定されているか確認：
+
+```bash
+# backend/.envファイルを確認
+cat backend/.env
+
+# 必要な変数が設定されているか確認
+# DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
 ```
 
 ### ポート競合
 
 デフォルトポートが使用中の場合、以下のファイルでポート番号を変更してください：
 
-- Backend: `backend/.env` の `PORT`
-- Frontend: `frontend/package.json` の dev スクリプト
-- Database: `docker-compose.yml` の ports
+- Backend: `backend/.env` の `PORT` (デフォルト: 8080)
+- Frontend: `frontend/.env.local` の `NEXT_PUBLIC_API_URL` (デフォルト: http://localhost:8080)
+- Database: `docker-compose.yml` の ports (デフォルト: 5432)
+
+使用中のポートを確認：
+
+```bash
+# macOS/Linux
+lsof -i :8080
+lsof -i :3000
+lsof -i :5432
+
+# プロセスを終了
+kill -9 <PID>
+```
 
 ### マイグレーションエラー
 
+マイグレーションが失敗する場合：
+
 ```bash
 # マイグレーションの状態確認
-migrate -path backend/migrations -database "postgresql://user:password@localhost:5432/dbname?sslmode=disable" version
+cd backend
+migrate -path migrations -database "postgresql://user:password@localhost:5432/social_worker_platform?sslmode=disable" version
 
-# 強制的にバージョンを設定
-migrate -path backend/migrations -database "postgresql://user:password@localhost:5432/dbname?sslmode=disable" force <version>
+# 強制的にバージョンを設定（慎重に使用）
+migrate -path migrations -database "postgresql://user:password@localhost:5432/social_worker_platform?sslmode=disable" force <version>
+
+# データベースをリセットして再マイグレーション
+make migrate-down
+make migrate-up
 ```
+
+### JWT認証エラー
+
+JWT_SECRETが設定されていない場合、認証が失敗します：
+
+```bash
+# backend/.envファイルにJWT_SECRETを追加
+echo "JWT_SECRET=$(openssl rand -base64 32)" >> backend/.env
+
+# サーバーを再起動
+```
+
+### ファイルアップロードエラー
+
+ファイルアップロードが失敗する場合：
+
+```bash
+# アップロードディレクトリの作成と権限設定
+mkdir -p backend/uploads
+chmod 755 backend/uploads
+
+# backend/.envでUPLOAD_DIRが正しく設定されているか確認
+cat backend/.env | grep UPLOAD_DIR
+```
+
+### フロントエンドのビルドエラー
+
+依存関係のインストールに失敗する場合：
+
+```bash
+cd frontend
+
+# node_modulesとpackage-lock.jsonを削除
+rm -rf node_modules package-lock.json
+
+# 再インストール
+npm install
+
+# キャッシュをクリア
+npm cache clean --force
+npm install
+```
+
+### CORS エラー
+
+フロントエンドからAPIにアクセスできない場合：
+
+```bash
+# backend/.envでCORS_ORIGINSが正しく設定されているか確認
+cat backend/.env | grep CORS_ORIGINS
+
+# フロントエンドのURLを追加（カンマ区切り）
+# CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+```
+
+### テスト実行エラー
+
+テストが失敗する場合：
+
+```bash
+# テスト用データベースの作成とマイグレーション
+docker-compose up -d postgres
+sleep 10
+
+cd backend
+DB_NAME=social_worker_platform_test make migrate-up
+
+# JWT_SECRETを設定してテスト実行
+JWT_SECRET=test-secret go test ./...
+
+# 短時間テストのみ実行（データベース不要）
+go test -short ./...
+```
+
+### 管理者アカウントの作成に失敗
+
+管理者アカウントの作成に失敗する場合：
+
+```bash
+# データベースが起動しているか確認
+docker-compose ps
+
+# マイグレーションが完了しているか確認
+cd backend
+make migrate-up
+
+# 管理者作成コマンドを再実行
+make create-admin
+```
+
+### 環境変数の確認
+
+すべての必要な環境変数が設定されているか確認：
+
+```bash
+# バックエンド
+cd backend
+cat .env
+
+# 必須変数:
+# - DB_HOST
+# - DB_PORT
+# - DB_USER
+# - DB_PASSWORD
+# - DB_NAME
+# - JWT_SECRET
+# - PORT
+# - CORS_ORIGINS
+# - UPLOAD_DIR
+
+# フロントエンド
+cd frontend
+cat .env.local
+
+# 必須変数:
+# - NEXT_PUBLIC_API_URL
+```
+
+詳細な環境変数の説明は [ENVIRONMENT.md](./ENVIRONMENT.md) を参照してください。
 
 ## ライセンス
 

@@ -2,10 +2,37 @@ package config
 
 import (
 	"database/sql"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// setupTestDB creates a test database connection
+func setupTestDB(t *testing.T) *sql.DB {
+	config := &DatabaseConfig{
+		Host:     getTestEnv("DB_HOST", "localhost"),
+		Port:     getTestEnv("DB_PORT", "5432"),
+		User:     getTestEnv("DB_USER", "postgres"),
+		Password: getTestEnv("DB_PASSWORD", "postgres"),
+		DBName:   getTestEnv("DB_NAME", "social_worker_platform_test"),
+		SSLMode:  "disable",
+	}
+
+	db, err := ConnectDatabase(config)
+	if err != nil {
+		t.Fatalf("Failed to connect to test database: %v", err)
+	}
+
+	return db
+}
+
+func getTestEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 // TestDatabaseConnectionError tests database connection error handling
 func TestDatabaseConnectionError(t *testing.T) {
@@ -15,7 +42,7 @@ func TestDatabaseConnectionError(t *testing.T) {
 		Port:     "9999",
 		User:     "invalid",
 		Password: "invalid",
-		Database: "invalid",
+		DBName:   "invalid",
 	}
 
 	db, err := ConnectDatabase(config)
@@ -27,6 +54,10 @@ func TestDatabaseConnectionError(t *testing.T) {
 
 // TestDatabaseQueryError tests query error handling
 func TestDatabaseQueryError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database test in short mode")
+	}
+
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -39,6 +70,10 @@ func TestDatabaseQueryError(t *testing.T) {
 
 // TestDatabaseTransactionRollback tests transaction rollback on error
 func TestDatabaseTransactionRollback(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database test in short mode")
+	}
+
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -57,6 +92,10 @@ func TestDatabaseTransactionRollback(t *testing.T) {
 
 // TestDatabaseClosedConnection tests operations on closed connection
 func TestDatabaseClosedConnection(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database test in short mode")
+	}
+
 	db := setupTestDB(t)
 	
 	// Close the connection
@@ -72,6 +111,10 @@ func TestDatabaseClosedConnection(t *testing.T) {
 
 // TestDatabasePingError tests ping error handling
 func TestDatabasePingError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database test in short mode")
+	}
+
 	db := setupTestDB(t)
 	
 	// Ping should succeed initially
@@ -88,6 +131,10 @@ func TestDatabasePingError(t *testing.T) {
 
 // TestDatabaseNullHandling tests NULL value handling
 func TestDatabaseNullHandling(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database test in short mode")
+	}
+
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -113,6 +160,10 @@ func TestDatabaseNullHandling(t *testing.T) {
 
 // TestDatabaseConstraintViolation tests constraint violation error handling
 func TestDatabaseConstraintViolation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database test in short mode")
+	}
+
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -136,6 +187,10 @@ func TestDatabaseConstraintViolation(t *testing.T) {
 
 // TestDatabaseConcurrentAccess tests concurrent database access
 func TestDatabaseConcurrentAccess(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping database test in short mode")
+	}
+
 	db := setupTestDB(t)
 	defer db.Close()
 
