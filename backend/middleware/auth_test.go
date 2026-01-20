@@ -249,3 +249,220 @@ func TestRefreshToken(t *testing.T) {
 		assert.Empty(t, newToken)
 	})
 }
+
+// TestInvalidTokenFormats tests various invalid token formats
+func TestInvalidTokenFormats(t *testing.T) {
+	os.Setenv("JWT_SECRET", "test-secret-key")
+	defer os.Unsetenv("JWT_SECRET")
+
+	testCases := []struct {
+		name  string
+		token string
+	}{
+		{"empty string", ""},
+		{"single part", "invalidtoken"},
+		{"two parts", "invalid.token"},
+		{"malformed JWT", "not.a.jwt.token"},
+		{"random string", "randomstringnotjwt"},
+		{"special characters", "!@#$%^&*()"},
+		{"SQL injection attempt", "'; DROP TABLE users; --"},
+		{"XSS attempt", "<script>alert('xss')</script>"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			claims, err := ValidateToken(tc.token)
+			assert.Error(t, err, "Should reject invalid token format: %s", tc.name)
+			assert.Nil(t, claims, "Claims should be nil for invalid token")
+		})
+	}
+}
+
+// TestTokenWithInvalidClaims tests tokens with invalid or missing claims
+func TestTokenWithInvalidClaims(t *testing.T) {
+	os.Setenv("JWT_SECRET", "test-secret-key")
+	defer os.Unsetenv("JWT_SECRET")
+
+	secret, _ := getJWTSecret()
+
+	t.Run("token with missing user ID", func(t *testing.T) {
+		claims := &Claims{
+			Email: "test@example.com",
+			Role:  "hospital",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		tokenString, _ := token.SignedString([]byte(secret))
+
+		validatedClaims, err := ValidateToken(tokenString)
+		// Token is technically valid, but UserID is 0
+		assert.NoError(t, err)
+		assert.Equal(t, 0, validatedClaims.UserID)
+	})
+
+	t.Run("token with missing email", func(t *testing.T) {
+		claims := &Claims{
+			UserID: 1,
+			Role:   "hospital",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		tokenString, _ := token.SignedString([]byte(secret))
+
+		validatedClaims, err := ValidateToken(tokenString)
+		assert.NoError(t, err)
+		assert.Empty(t, validatedClaims.Email)
+	})
+
+	t.Run("token with missing role", func(t *testing.T) {
+		claims := &Claims{
+			UserID: 1,
+			Email:  "test@example.com",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		tokenString, _ := token.SignedString([]byte(secret))
+
+		validatedClaims, err := ValidateToken(tokenString)
+		assert.NoError(t, err)
+		assert.Empty(t, validatedClaims.Role)
+	})
+}
+
+// TestTokenWithDifferentSigningMethods tests tokens signed with different algorithms
+func TestTokenWithDifferentSigningMethods(t *testing.T) {
+	os.Setenv("JWT_SECRET", "test-secret-key")
+	defer os.Unsetenv("JWT_SECRET")
+
+	secret, _ := getJWTSecret()
+
+	t.Run("token with HS512 algorithm", func(t *testing.T) {
+		claims := &Claims{
+			UserID: 1,
+			Email:  "test@example.com",
+			Role:   "hospital",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+		tokenString, _ := token.SignedString([]byte(secret))
+
+		// Should fail because we expect HS256
+		validatedClaims, err := ValidateToken(tokenString)
+		assert.Error(t, err)
+		assert.Nil(t, validatedClaims)
+	})
+
+	t.Run("token with none algorithm", func(t *testing.T) {
+		claims := &Claims{
+			UserID: 1,
+			Email:  "test@example.com",
+			Role:   "hospital",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodNone, claims)
+		tokenString, _ := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+
+		// Should fail because we don't allow 'none' algorithm
+		validatedClaims, err := ValidateToken(tokenString)
+		assert.Error(t, err)
+		assert.Nil(t, validatedClaims)
+	})
+}
+
+// TestPasswordEdgeCases tests password hashing with edge cases
+func TestPasswordEdgeCases(t *testing.T) {
+	os.Setenv("JWT_SECRET", "test-secret-key")
+	defer os.Unsetenv("JWT_SECRET")
+
+	t.Run("very long password", func(t *testing.T) {
+		longPassword := string(make([]byte, 1000))
+		for i := range longPassword {
+			longPassword = longPassword[:i] + "a" + longPassword[i+1:]
+		}
+
+		hashed, err := HashPassword(longPassword)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, hashed)
+
+		result := VerifyPassword(hashed, longPassword)
+		assert.True(t, result)
+	})
+
+	t.Run("password with special characters", func(t *testing.T) {
+		specialPassword := "!@#$%^&*()_+-=[]{}|;':\",./<>?"
+		hashed, err := HashPassword(specialPassword)
+		assert.NoError(t, err)
+
+		result := VerifyPassword(hashed, specialPassword)
+		assert.True(t, result)
+	})
+
+	t.Run("password with unicode characters", func(t *testing.T) {
+		unicodePassword := "パスワード123🔒"
+		hashed, err := HashPassword(unicodePassword)
+		assert.NoError(t, err)
+
+		result := VerifyPassword(hashed, unicodePassword)
+		assert.True(t, result)
+	})
+
+	t.Run("empty password hash", func(t *testing.T) {
+		result := VerifyPassword("", "anypassword")
+		assert.False(t, result)
+	})
+
+	t.Run("invalid hash format", func(t *testing.T) {
+		result := VerifyPassword("not-a-valid-bcrypt-hash", "password")
+		assert.False(t, result)
+	})
+}
+
+// TestConcurrentTokenOperations tests thread safety of token operations
+func TestConcurrentTokenOperations(t *testing.T) {
+	os.Setenv("JWT_SECRET", "test-secret-key")
+	defer os.Unsetenv("JWT_SECRET")
+
+	t.Run("concurrent token generation", func(t *testing.T) {
+		done := make(chan bool, 100)
+		for i := 0; i < 100; i++ {
+			go func(id int) {
+				token, err := GenerateToken(id, "test@example.com", "hospital")
+				assert.NoError(t, err)
+				assert.NotEmpty(t, token)
+				done <- true
+			}(i)
+		}
+
+		for i := 0; i < 100; i++ {
+			<-done
+		}
+	})
+
+	t.Run("concurrent token validation", func(t *testing.T) {
+		token, _ := GenerateToken(1, "test@example.com", "hospital")
+
+		done := make(chan bool, 100)
+		for i := 0; i < 100; i++ {
+			go func() {
+				claims, err := ValidateToken(token)
+				assert.NoError(t, err)
+				assert.NotNil(t, claims)
+				done <- true
+			}()
+		}
+
+		for i := 0; i < 100; i++ {
+			<-done
+		}
+	})
+}
