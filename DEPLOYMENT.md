@@ -117,6 +117,18 @@ go run cmd/create-admin/main.go
 3. 病院と施設のアカウントを作成
 4. 各機能をテスト
 
+## 6. APIドキュメント
+
+バックエンドには Swagger UI が統合されています。以下のURLでAPIドキュメントを確認できます：
+
+- ローカル環境: http://localhost:8080/api/docs
+- 本番環境: https://your-backend.onrender.com/api/docs
+
+OpenAPI仕様ファイルは以下から直接アクセスできます：
+
+- http://localhost:8080/api/docs/openapi.yaml
+- https://your-backend.onrender.com/api/docs/openapi.yaml
+
 ## トラブルシューティング
 
 ### データベース接続エラー

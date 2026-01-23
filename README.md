@@ -196,7 +196,30 @@ make migrate-down
 
 ## API仕様
 
-詳細なAPI仕様は [API.md](./API.md) を参照してください。
+### Swagger UI（推奨）
+
+バックエンドには Swagger UI が統合されており、インタラクティブなAPIドキュメントを提供しています：
+
+- **ローカル環境**: http://localhost:8080/api/docs
+- **本番環境**: https://your-backend.onrender.com/api/docs
+
+Swagger UIでは以下が可能です：
+
+- 全エンドポイントの詳細仕様の閲覧
+- リクエスト/レスポンスの例の確認
+- ブラウザから直接APIをテスト
+- 認証トークンの設定と使用
+
+### OpenAPI仕様ファイル
+
+OpenAPI 3.0.3形式の仕様ファイルは以下から直接アクセスできます：
+
+- http://localhost:8080/api/docs/openapi.yaml
+- https://your-backend.onrender.com/api/docs/openapi.yaml
+
+### API.md
+
+詳細なAPI仕様は [API.md](./API.md) も参照してください。
 
 完全なAPIドキュメントには以下が含まれます：
 
