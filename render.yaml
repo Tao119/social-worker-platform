@@ -1,0 +1,48 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: social-worker-db
+    env: docker
+    plan: free
+    region: oregon
+    databases:
+      - name: social_worker_platform
+        user: postgres
+
+  # Backend API
+  - type: web
+    name: social-worker-backend
+    env: go
+    region: oregon
+    plan: free
+    buildCommand: cd backend && go build -o bin/server cmd/server/main.go
+    startCommand: cd backend && ./bin/server
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: GIN_MODE
+        value: release
+      - key: DB_HOST
+        fromDatabase:
+          name: social-worker-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: social-worker-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: social-worker-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: social-worker-db
+          property: password
+      - key: DB_NAME
+        value: social_worker_platform
+      - key: DB_SSLMODE
+        value: require
+      - key: JWT_SECRET
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: /opt/render/project/src/uploads

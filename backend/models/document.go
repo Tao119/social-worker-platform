@@ -13,6 +13,7 @@ type Document struct {
 	Title        string    `json:"title"`
 	FilePath     string    `json:"file_path"`
 	DocumentType string    `json:"document_type"`
+	Folder       string    `json:"folder"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -24,16 +25,16 @@ func NewDocumentRepository(db *sql.DB) *DocumentRepository {
 	return &DocumentRepository{db: db}
 }
 
-func (r *DocumentRepository) Create(senderID, recipientID int, title, filePath, documentType string) (*Document, error) {
+func (r *DocumentRepository) Create(senderID, recipientID int, title, filePath, documentType, folder string) (*Document, error) {
 	document := &Document{}
 	query := `
-		INSERT INTO documents (sender_id, recipient_id, title, file_path, document_type)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, sender_id, recipient_id, title, file_path, document_type, created_at
+		INSERT INTO documents (sender_id, recipient_id, title, file_path, document_type, folder)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, sender_id, recipient_id, title, file_path, document_type, folder, created_at
 	`
-	err := r.db.QueryRow(query, senderID, recipientID, title, filePath, documentType).Scan(
+	err := r.db.QueryRow(query, senderID, recipientID, title, filePath, documentType, folder).Scan(
 		&document.ID, &document.SenderID, &document.RecipientID, &document.Title,
-		&document.FilePath, &document.DocumentType, &document.CreatedAt,
+		&document.FilePath, &document.DocumentType, &document.Folder, &document.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create document: %w", err)
@@ -45,13 +46,13 @@ func (r *DocumentRepository) Create(senderID, recipientID int, title, filePath, 
 func (r *DocumentRepository) GetByID(id int) (*Document, error) {
 	document := &Document{}
 	query := `
-		SELECT id, sender_id, recipient_id, title, file_path, document_type, created_at
+		SELECT id, sender_id, recipient_id, title, file_path, document_type, folder, created_at
 		FROM documents
 		WHERE id = $1
 	`
 	err := r.db.QueryRow(query, id).Scan(
 		&document.ID, &document.SenderID, &document.RecipientID, &document.Title,
-		&document.FilePath, &document.DocumentType, &document.CreatedAt,
+		&document.FilePath, &document.DocumentType, &document.Folder, &document.CreatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("document not found")
@@ -65,10 +66,10 @@ func (r *DocumentRepository) GetByID(id int) (*Document, error) {
 
 func (r *DocumentRepository) GetByUserID(userID int) ([]*Document, error) {
 	query := `
-		SELECT id, sender_id, recipient_id, title, file_path, document_type, created_at
+		SELECT id, sender_id, recipient_id, title, file_path, document_type, folder, created_at
 		FROM documents
 		WHERE sender_id = $1 OR recipient_id = $1
-		ORDER BY created_at DESC
+		ORDER BY folder, created_at DESC
 	`
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
@@ -81,7 +82,7 @@ func (r *DocumentRepository) GetByUserID(userID int) ([]*Document, error) {
 		document := &Document{}
 		err := rows.Scan(
 			&document.ID, &document.SenderID, &document.RecipientID, &document.Title,
-			&document.FilePath, &document.DocumentType, &document.CreatedAt,
+			&document.FilePath, &document.DocumentType, &document.Folder, &document.CreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan document: %w", err)

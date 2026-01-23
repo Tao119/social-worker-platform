@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { documentAPI } from "@/lib/api";
 
 export default function DocumentsPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,16 +18,19 @@ export default function DocumentsPage() {
     title: "",
     document_type: "",
     recipient_id: "",
+    folder: "",
     file: null,
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push("/login");
       return;
     }
-    loadDocuments();
-  }, [isAuthenticated, router]);
+    if (isAuthenticated) {
+      loadDocuments();
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const loadDocuments = async () => {
     try {
@@ -64,6 +67,9 @@ export default function DocumentsPage() {
       formData.append("title", uploadData.title);
       formData.append("document_type", uploadData.document_type);
       formData.append("recipient_id", parseInt(uploadData.recipient_id));
+      if (uploadData.folder) {
+        formData.append("folder", uploadData.folder);
+      }
 
       await documentAPI.upload(formData);
       setSuccess("書類をアップロードしました");
@@ -72,6 +78,7 @@ export default function DocumentsPage() {
         title: "",
         document_type: "",
         recipient_id: "",
+        folder: "",
         file: null,
       });
       await loadDocuments();
@@ -97,6 +104,43 @@ export default function DocumentsPage() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!confirm("この書類を削除してもよろしいですか？")) {
+      return;
+    }
+
+    try {
+      setError("");
+      await documentAPI.delete(id);
+      setSuccess("書類を削除しました");
+      await loadDocuments();
+    } catch (err) {
+      setError(err.response?.data?.error || "削除に失敗しました");
+    }
+  };
+
+  // Group documents by folder
+  const groupedDocuments = documents.reduce((acc, doc) => {
+    const folder = doc.folder || "未分類";
+    if (!acc[folder]) {
+      acc[folder] = [];
+    }
+    acc[folder].push(doc);
+    return acc;
+  }, {});
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-gray-500">読み込み中...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return null;
   }
@@ -111,12 +155,20 @@ export default function DocumentsPage() {
               送受信した書類を管理できます
             </p>
           </div>
-          <button
-            onClick={() => setShowUploadForm(!showUploadForm)}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            {showUploadForm ? "キャンセル" : "書類をアップロード"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowUploadForm(!showUploadForm)}
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              {showUploadForm ? "キャンセル" : "書類をアップロード"}
+            </button>
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              ダッシュボードに戻る
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -201,6 +253,28 @@ export default function DocumentsPage() {
 
               <div>
                 <label
+                  htmlFor="folder"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  フォルダ
+                </label>
+                <input
+                  type="text"
+                  id="folder"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                  placeholder="例: 契約書、診断書など"
+                  value={uploadData.folder}
+                  onChange={(e) =>
+                    setUploadData({
+                      ...uploadData,
+                      folder: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div>
+                <label
                   htmlFor="file"
                   className="block text-sm font-medium text-gray-700"
                 >
@@ -230,58 +304,80 @@ export default function DocumentsPage() {
           <div className="text-center py-12">
             <div className="text-gray-500">読み込み中...</div>
           </div>
-        ) : (
+        ) : documents.length === 0 ? (
           <div className="bg-white shadow overflow-hidden sm:rounded-md">
-            {documents.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500">書類がありません</p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-200">
-                {documents.map((doc) => (
-                  <li key={doc.id}>
-                    <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-medium text-gray-900">
-                            {doc.title}
-                          </h3>
-                          <div className="mt-2 sm:flex sm:justify-between">
-                            <div className="sm:flex">
-                              {doc.document_type && (
-                                <p className="flex items-center text-sm text-gray-500">
-                                  種別: {doc.document_type}
+            <div className="text-center py-12">
+              <p className="text-gray-500">書類がありません</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(groupedDocuments).map(([folder, docs]) => (
+              <div
+                key={folder}
+                className="bg-white shadow overflow-hidden sm:rounded-md"
+              >
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                  <h2 className="text-lg font-medium text-gray-900">
+                    📁 {folder}
+                  </h2>
+                </div>
+                <ul className="divide-y divide-gray-200">
+                  {docs.map((doc) => (
+                    <li key={doc.id}>
+                      <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-medium text-gray-900">
+                              {doc.title}
+                            </h3>
+                            <div className="mt-2 sm:flex sm:justify-between">
+                              <div className="sm:flex">
+                                {doc.document_type && (
+                                  <p className="flex items-center text-sm text-gray-500">
+                                    種別: {doc.document_type}
+                                  </p>
+                                )}
+                                <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                                  送信者ID: {doc.sender_id}
                                 </p>
-                              )}
-                              <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
-                                送信者ID: {doc.sender_id}
-                              </p>
-                              <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
-                                受信者ID: {doc.recipient_id}
-                              </p>
+                                <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                                  受信者ID: {doc.recipient_id}
+                                </p>
+                              </div>
                             </div>
+                            {doc.created_at && (
+                              <p className="mt-2 text-sm text-gray-500">
+                                作成日時:{" "}
+                                {new Date(doc.created_at).toLocaleString(
+                                  "ja-JP",
+                                )}
+                              </p>
+                            )}
                           </div>
-                          {doc.created_at && (
-                            <p className="mt-2 text-sm text-gray-500">
-                              作成日時:{" "}
-                              {new Date(doc.created_at).toLocaleString("ja-JP")}
-                            </p>
-                          )}
-                        </div>
-                        <div className="ml-5 flex-shrink-0">
-                          <button
-                            onClick={() => handleDownload(doc.id, doc.title)}
-                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                          >
-                            ダウンロード
-                          </button>
+                          <div className="ml-5 flex-shrink-0 flex gap-2">
+                            <button
+                              onClick={() => handleDownload(doc.id, doc.title)}
+                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                              ダウンロード
+                            </button>
+                            {doc.sender_id === user?.id && (
+                              <button
+                                onClick={() => handleDelete(doc.id)}
+                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                              >
+                                削除
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         )}
       </div>

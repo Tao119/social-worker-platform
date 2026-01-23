@@ -2,7 +2,7 @@
 
 ## Overview
 
-このプランは、Next.js (JavaScript) フロントエンド、Gin (Go) バックエンド、PostgreSQLデータベースを使用したソーシャルワーカープラットフォームの実装手順を定義します。各タスクは段階的に構築され、コア機能を早期に検証します。
+このプランは、Next.js (JavaScript) フロントエンド、Gin (Go) バックエンド、PostgreSQLデータベースを使用したソーシャルワーカープラットフォームの実装手順を定義します。各タスクは段階的に構築され、患者受け入れリクエストから専用メッセージルームでのコミュニケーション、最終承認までのフローを実装します。
 
 ## Tasks
 
@@ -123,24 +123,74 @@
     - 無効なデータ形式のテスト
     - _Requirements: 2.4_
 
-- [x] 8. 書類管理API実装
-  - [ ] 8.1 書類エンドポイント実装
-    - 書類アップロードエンドポイント（POST /api/documents）を実装
-    - 書類一覧取得エンドポイント（GET /api/documents）を実装
-    - 書類詳細取得エンドポイント（GET /api/documents/:id）を実装
-    - ファイルストレージ処理を実装（ローカルまたはS3）
-    - _Requirements: 4.1, 4.2, 4.4_
-  - [ ] 8.2 書類管理のプロパティテスト
-    - **Property 16: Document sending creates record**
-    - **Property 17: Users can view their documents**
-    - **Property 19: Document metadata is complete**
-    - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.6**
-  - [ ] 8.3 書類認可のプロパティテスト
-    - **Property 18: Document access is restricted**
-    - **Validates: Requirements 4.5**
+- [x] 8. 受け入れリクエストAPI実装
+  - [x] 8.1 データモデルとマイグレーション
+    - placement_requestsテーブルのマイグレーションファイルを作成
+    - PlacementRequestモデルを実装（CRUD操作）
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 8.2 受け入れリクエストエンドポイント実装
+    - リクエスト作成エンドポイント（POST /api/requests）を実装
+    - リクエスト一覧取得エンドポイント（GET /api/requests）を実装
+    - リクエスト詳細取得エンドポイント（GET /api/requests/:id）を実装
+    - リクエスト承認エンドポイント（POST /api/requests/:id/accept）を実装
+    - リクエスト拒否エンドポイント（POST /api/requests/:id/reject）を実装
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - [ ] 8.3 リクエスト管理のプロパティテスト
+    - **Property 16: Placement request stores complete patient data**
+    - **Property 17: Placement request notification is created**
+    - **Property 19: Request rejection prevents further actions**
+    - **Property 21: One request per patient**
+    - **Validates: Requirements 4.1, 4.2, 4.3, 4.5, 4.8**
+  - [ ] 8.4 リクエスト承認のユニットテスト
+    - 承認時のルーム作成テスト
+    - 拒否時のステータス更新テスト
+    - _Requirements: 4.4, 4.5_
 
-- [x] 9. 管理者API実装
-  - [ ] 9.1 管理者エンドポイント実装
+- [x] 9. メッセージルームAPI実装
+  - [x] 9.1 データモデルとマイグレーション
+    - message_roomsテーブルのマイグレーションファイルを作成
+    - messagesテーブルのマイグレーションファイルを作成
+    - room_filesテーブルのマイグレーションファイルを作成
+    - MessageRoomモデルを実装（CRUD操作）
+    - Messageモデルを実装（CRUD操作）
+    - RoomFileモデルを実装（CRUD操作）
+    - _Requirements: 4.4, 4.6, 4.7, 5.1, 5.2_
+  - [x] 9.2 メッセージルームエンドポイント実装
+    - ルーム一覧取得エンドポイント（GET /api/rooms）を実装
+    - ルーム詳細取得エンドポイント（GET /api/rooms/:id）を実装
+    - メッセージ送信エンドポイント（POST /api/rooms/:id/messages）を実装
+    - ファイル送信エンドポイント（POST /api/rooms/:id/files）を実装
+    - ファイルダウンロードエンドポイント（GET /api/rooms/:id/files/:fileId）を実装
+    - 最終承認エンドポイント（POST /api/rooms/:id/accept）を実装
+    - 最終拒否エンドポイント（POST /api/rooms/:id/reject）を実装
+    - _Requirements: 5.1, 5.2, 5.5, 6.2, 6.3_
+  - [ ] 9.3 ルーム作成のプロパティテスト
+    - **Property 18: Request acceptance creates unique room**
+    - **Property 20: Room associations are complete**
+    - **Validates: Requirements 4.4, 4.6, 4.7**
+  - [ ] 9.4 メッセージ・ファイル送信のプロパティテスト
+    - **Property 23: Active rooms allow message and file sending**
+    - **Property 24: Messages and files have complete metadata**
+    - **Property 25: Room content is chronologically ordered**
+    - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5**
+  - [ ] 9.5 ルームアクセス制御のプロパティテスト
+    - **Property 22: Room access is restricted**
+    - **Property 26: Unauthorized sending is prevented**
+    - **Property 27: Final acceptance controls are facility-only**
+    - **Validates: Requirements 4.9, 5.6, 5.7, 6.6**
+  - [ ] 9.6 最終承認プロセスのプロパティテスト
+    - **Property 28: Final acceptance enables document exchange**
+    - **Property 29: Final rejection closes room**
+    - **Property 30: Room status is valid**
+    - **Validates: Requirements 6.2, 6.3, 6.4, 6.5, 6.7**
+
+- [ ] 10. チェックポイント - リクエストとルーム機能の動作確認
+  - すべてのテストが通ることを確認
+  - リクエスト作成からルーム作成、メッセージ送信、最終承認までのフローが正常に動作することを確認
+  - 質問があればユーザーに確認
+
+- [x] 11. 管理者API実装
+  - [ ] 11.1 管理者エンドポイント実装
     - 病院アカウント作成エンドポイント（POST /api/admin/hospitals）を実装
     - 病院一覧取得エンドポイント（GET /api/admin/hospitals）を実装
     - 病院更新エンドポイント（PUT /api/admin/hospitals/:id）を実装
@@ -149,161 +199,181 @@
     - 施設一覧取得エンドポイント（GET /api/admin/facilities）を実装
     - 施設更新エンドポイント（PUT /api/admin/facilities/:id）を実装
     - 施設削除エンドポイント（DELETE /api/admin/facilities/:id）を実装
-    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
-  - [ ] 9.2 管理者機能のプロパティテスト
-    - **Property 20: Admin creates hospital accounts**
-    - **Property 21: Admin creates facility accounts**
-    - **Property 22: Admin updates are persisted**
-    - **Property 23: Account deletion marks inactive**
-    - **Property 24: Admin can view all entities**
-    - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5**
-  - [ ] 9.3 管理者認可のプロパティテスト
-    - **Property 25: Non-admins cannot access admin functions**
-    - **Validates: Requirements 5.6**
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
+  - [ ] 11.2 管理者機能のプロパティテスト
+    - **Property 31: Admin creates hospital accounts**
+    - **Property 32: Admin creates facility accounts**
+    - **Property 33: Admin updates are persisted**
+    - **Property 34: Account deletion marks inactive**
+    - **Property 35: Admin can view all entities**
+    - **Validates: Requirements 7.1, 7.2, 7.3, 7.4, 7.5**
+  - [ ] 11.3 管理者認可のプロパティテスト
+    - **Property 36: Non-admins cannot access admin functions**
+    - **Validates: Requirements 7.6**
 
-- [x] 10. バックエンドAPI共通機能
-  - [ ] 10.1 入力バリデーションとセキュリティ
+- [x] 12. バックエンドAPI共通機能
+  - [ ] 12.1 入力バリデーションとセキュリティ
     - 入力サニタイゼーション関数を実装
     - レート制限ミドルウェアを実装
-    - _Requirements: 7.4, 8.3, 8.5_
-  - [ ] 10.2 APIレスポンス形式のプロパティテスト
-    - **Property 29: API responses are valid JSON**
-    - **Property 30: Failed requests return proper status codes**
-    - **Property 31: Invalid input is rejected**
-    - **Validates: Requirements 7.2, 7.3, 7.4**
-  - [ ] 10.3 セキュリティのプロパティテスト
-    - **Property 34: Malicious input is sanitized**
-    - **Property 35: Rate limiting prevents abuse**
-    - **Validates: Requirements 8.3, 8.5**
+    - _Requirements: 9.4, 10.3, 10.5_
+  - [ ] 12.2 APIレスポンス形式のプロパティテスト
+    - **Property 40: API responses are valid JSON**
+    - **Property 41: Failed requests return proper status codes**
+    - **Property 42: Invalid input is rejected**
+    - **Validates: Requirements 9.2, 9.3, 9.4**
+  - [ ] 12.3 セキュリティのプロパティテスト
+    - **Property 45: Malicious input is sanitized**
+    - **Property 46: Rate limiting prevents abuse**
+    - **Validates: Requirements 10.3, 10.5**
 
-- [ ] 11. チェックポイント - バックエンドAPI完成確認
+- [ ] 13. チェックポイント - バックエンドAPI完成確認
   - すべてのテストが通ることを確認
   - すべてのAPIエンドポイントが正常に動作することを確認
   - Postmanやcurlでエンドポイントをテスト
   - 質問があればユーザーに確認
 
-- [ ] 12. フロントエンド初期化
-  - [ ] 12.1 Next.jsプロジェクト作成
+- [ ] 14. フロントエンド初期化
+  - [ ] 14.1 Next.jsプロジェクト作成
     - Next.jsプロジェクトを作成（JavaScript）
     - 必要な依存関係をインストール（axios、react-hook-form）
     - ディレクトリ構造を作成（components、pages、lib、styles）
-    - _Requirements: 7.1_
-  - [ ] 12.2 API通信ライブラリ
+    - _Requirements: 9.1_
+  - [ ] 14.2 API通信ライブラリ
     - APIクライアントを実装（axios設定、認証ヘッダー）
     - エラーハンドリングを実装
-    - _Requirements: 7.1, 7.3_
+    - _Requirements: 9.1, 9.3_
 
-- [ ] 13. 認証UI実装
-  - [ ] 13.1 ログインページ
+- [ ] 15. 認証UI実装
+  - [ ] 15.1 ログインページ
     - ログインフォームコンポーネントを実装
     - ログイン処理を実装（JWT保存）
     - エラー表示を実装
     - _Requirements: 1.2, 1.3_
-  - [ ] 13.2 認証コンテキスト
+  - [ ] 15.2 認証コンテキスト
     - 認証状態管理（React Context）を実装
     - ログアウト機能を実装
     - 保護されたルートコンポーネントを実装
     - _Requirements: 1.4, 1.5_
-  - [ ] 13.3 認証UIのユニットテスト
+  - [ ] 15.3 認証UIのユニットテスト
     - ログインフォームのテスト
     - 認証コンテキストのテスト
     - _Requirements: 1.2, 1.3, 1.4_
 
-- [ ] 14. 施設ユーザーUI実装
-  - [ ] 14.1 施設情報登録・編集フォーム
+- [ ] 16. 施設ユーザーUI実装
+  - [ ] 16.1 施設情報登録・編集フォーム
     - 施設情報フォームコンポーネントを実装
     - フォームバリデーションを実装
     - 施設情報の作成・更新処理を実装
     - _Requirements: 2.1, 2.2_
-  - [ ] 14.2 施設ダッシュボード
+  - [ ] 16.2 施設ダッシュボード
     - 施設ダッシュボードページを実装
     - 自施設情報表示を実装
-    - _Requirements: 2.5_
-  - [ ] 14.3 施設UIのユニットテスト
+    - 受け入れリクエスト通知一覧を実装
+    - _Requirements: 2.5, 4.2_
+  - [ ] 16.3 施設UIのユニットテスト
     - フォームバリデーションのテスト
     - 施設情報表示のテスト
     - _Requirements: 2.1, 2.2, 2.5_
 
-- [ ] 15. 病院ユーザーUI実装
-  - [ ] 15.1 施設検索ページ
+- [ ] 17. 病院ユーザーUI実装
+  - [ ] 17.1 施設検索ページ
     - 施設検索フォームコンポーネントを実装
     - フィルター機能を実装（病床数、受け入れ条件、場所）
     - 検索結果一覧表示を実装
     - _Requirements: 3.1, 3.2_
-  - [ ] 15.2 施設詳細ページ
+  - [x] 17.2 施設詳細ページと受け入れリクエスト作成
     - 施設詳細表示コンポーネントを実装
-    - _Requirements: 3.3_
-  - [ ] 15.3 病院ダッシュボード
+    - 受け入れリクエスト作成フォームを実装
+    - 施設詳細ページに「受け入れリクエストを作成」ボタンを追加
+    - _Requirements: 3.3, 4.1_
+  - [x] 17.3 病院ダッシュボード
     - 病院ダッシュボードページを実装
-    - _Requirements: 3.1_
-  - [ ] 15.4 病院UIのユニットテスト
+    - 送信済みリクエスト一覧を実装
+    - ダッシュボードにリクエスト管理とメッセージルームへのリンクを追加
+    - _Requirements: 3.1, 4.1_
+  - [ ] 17.4 病院UIのユニットテスト
     - 検索フォームのテスト
     - フィルター機能のテスト
-    - _Requirements: 3.1, 3.2, 3.3_
+    - リクエスト作成フォームのテスト
+    - _Requirements: 3.1, 3.2, 3.3, 4.1_
 
-- [ ] 16. 書類管理UI実装
-  - [ ] 16.1 書類アップロードコンポーネント
-    - ファイルアップロードフォームを実装
-    - 送信先選択機能を実装
-    - アップロード処理を実装
-    - _Requirements: 4.1, 4.2_
-  - [ ] 16.2 書類一覧・詳細表示
-    - 書類一覧コンポーネントを実装
-    - 書類詳細表示コンポーネントを実装
-    - _Requirements: 4.4_
-  - [ ] 16.3 書類UIのユニットテスト
+- [x] 18. メッセージルームUI実装
+  - [x] 18.1 リクエスト承認・拒否UI（施設側）
+    - リクエスト一覧コンポーネントを実装
+    - リクエスト詳細表示と承認・拒否ボタンを実装
+    - _Requirements: 4.2, 4.3, 4.4, 4.5_
+  - [x] 18.2 メッセージルーム一覧
+    - ルーム一覧コンポーネントを実装（病院・施設共通）
+    - ルームステータス表示を実装
+    - _Requirements: 5.1_
+  - [x] 18.3 メッセージルームインターフェース
+    - メッセージ表示コンポーネントを実装（時系列）
+    - メッセージ送信フォームを実装
+    - ファイルアップロードコンポーネントを実装
+    - ファイル一覧・ダウンロード機能を実装
+    - リアルタイム更新（5秒ごとのポーリング）を実装
+    - _Requirements: 5.1, 5.2, 5.5_
+  - [x] 18.4 最終承認・拒否UI（施設側）
+    - 最終承認・拒否ボタンを実装（ルーム上部）
+    - 承認後の書類交換UI表示を実装
+    - _Requirements: 6.2, 6.3, 6.5_
+  - [ ] 18.5 メッセージルームUIのユニットテスト
+    - メッセージ送信のテスト
     - ファイルアップロードのテスト
-    - 書類一覧表示のテスト
-    - _Requirements: 4.1, 4.2, 4.4_
+    - 最終承認・拒否のテスト
+    - _Requirements: 5.1, 5.2, 6.2, 6.3_
 
-- [ ] 17. 管理者UI実装
-  - [ ] 17.1 アカウント管理ページ
+- [ ] 19. 管理者UI実装
+  - [ ] 19.1 アカウント管理ページ
     - 病院アカウント一覧・作成・編集・削除UIを実装
     - 施設アカウント一覧・作成・編集・削除UIを実装
-    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
-  - [ ] 17.2 管理者ダッシュボード
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
+  - [ ] 19.2 管理者ダッシュボード
     - 管理者ダッシュボードページを実装
     - システム概要表示を実装
-    - _Requirements: 5.5_
-  - [ ] 17.3 管理者UIのユニットテスト
+    - _Requirements: 7.5_
+  - [ ] 19.3 管理者UIのユニットテスト
     - アカウント管理フォームのテスト
     - 一覧表示のテスト
-    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 18. チェックポイント - フロントエンド完成確認
+- [ ] 20. チェックポイント - フロントエンド完成確認
   - すべてのテストが通ることを確認
   - すべてのページが正常に表示されることを確認
   - ブラウザで各機能をテスト
   - 質問があればユーザーに確認
 
-- [x] 19. 統合とデプロイ準備
-  - [ ] 19.1 環境設定ファイル
+- [x] 21. 統合とデプロイ準備
+  - [ ] 21.1 環境設定ファイル
     - .env.exampleファイルを作成（フロントエンド・バックエンド）
     - 環境変数の説明をREADMEに追加
     - _Requirements: 全体_
-  - [ ] 19.2 Docker設定
+  - [ ] 21.2 Docker設定
     - Dockerfileを作成（フロントエンド・バックエンド）
     - docker-compose.ymlを更新（全サービス統合）
     - _Requirements: 全体_
-  - [ ] 19.3 統合テスト
+  - [ ] 21.3 統合テスト
     - エンドツーエンドフローのテスト
     - 認証フローの統合テスト
+    - リクエストからルーム、最終承認までのフローテスト
     - _Requirements: 全体_
 
-- [x] 20. ドキュメント整備
-  - [x] 20.1 README更新
+- [x] 22. ドキュメント整備
+  - [x] 22.1 README更新
     - セットアップ手順を詳細化
     - API仕様書へのリンクを追加
     - トラブルシューティングセクションを追加
     - _Requirements: 全体_
-  - [x] 20.2 API仕様書
+  - [x] 22.2 API仕様書
     - API仕様書を作成（エンドポイント一覧、リクエスト・レスポンス例）
-    - _Requirements: 7.1, 7.2_
+    - 新しいエンドポイント（/api/requests、/api/rooms）を追加
+    - _Requirements: 9.1, 9.2_
 
-- [x] 21. 最終チェックポイント
+- [x] 23. 最終チェックポイント
   - すべてのテストが通ることを確認
   - docker-composeで全サービスが起動することを確認
   - 各ユーザーロールで主要機能が動作することを確認
+  - リクエスト作成→承認→メッセージ交換→最終承認のフルフローを確認
   - コード全体をリファクタリング（必要に応じて）
   - 質問があればユーザーに確認
 

@@ -64,6 +64,7 @@ export const documentAPI = {
     api.get(`/api/documents/${id}/download`, {
       responseType: "blob",
     }),
+  delete: (id) => api.delete(`/api/documents/${id}`),
 };
 
 // Admin API
@@ -76,6 +77,38 @@ export const adminAPI = {
   listFacilities: () => api.get("/api/admin/facilities"),
   updateFacility: (id, data) => api.put(`/api/admin/facilities/${id}`, data),
   deleteFacility: (id) => api.delete(`/api/admin/facilities/${id}`),
+};
+
+// Placement Request API
+export const requestAPI = {
+  create: (data) => api.post("/api/requests", data),
+  list: () => api.get("/api/requests"),
+  getById: (id) => api.get(`/api/requests/${id}`),
+  update: (id, data) => api.put(`/api/requests/${id}`, data),
+  cancel: (id) => api.delete(`/api/requests/${id}`),
+  accept: (id) => api.post(`/api/requests/${id}/accept`),
+  reject: (id) => api.post(`/api/requests/${id}/reject`),
+};
+
+// Message Room API
+export const roomAPI = {
+  list: () => api.get("/api/rooms"),
+  getById: (id) => api.get(`/api/rooms/${id}`),
+  sendMessage: (id, data) => api.post(`/api/rooms/${id}/messages`, data),
+  uploadFile: (id, formData) =>
+    api.post(`/api/rooms/${id}/files`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  downloadFile: (roomId, fileId) =>
+    api.get(`/api/rooms/${roomId}/files/${fileId}`, {
+      responseType: "blob",
+    }),
+  deleteFile: (roomId, fileId) =>
+    api.delete(`/api/rooms/${roomId}/files/${fileId}`),
+  accept: (id) => api.post(`/api/rooms/${id}/accept`),
+  reject: (id) => api.post(`/api/rooms/${id}/reject`),
+  complete: (id) => api.post(`/api/rooms/${id}/complete`),
+  cancelCompletion: (id) => api.post(`/api/rooms/${id}/cancel-completion`),
 };
 
 export default api;

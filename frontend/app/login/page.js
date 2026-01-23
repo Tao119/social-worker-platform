@@ -5,19 +5,31 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const result = await login(email, password);
+    console.log("Submitting login with:", formData.email);
+
+    const result = await login(formData.email, formData.password);
 
     if (result.success) {
       router.push("/dashboard");
@@ -57,8 +69,9 @@ export default function LoginPage() {
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="メールアドレス"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleChange}
+                disabled={loading}
               />
             </div>
             <div>
@@ -73,8 +86,9 @@ export default function LoginPage() {
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="パスワード"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={formData.password}
+                onChange={handleChange}
+                disabled={loading}
               />
             </div>
           </div>
@@ -87,6 +101,13 @@ export default function LoginPage() {
             >
               {loading ? "ログイン中..." : "ログイン"}
             </button>
+          </div>
+
+          <div className="text-center text-sm text-gray-600">
+            <p>デフォルト管理者アカウント:</p>
+            <p className="font-mono text-xs mt-1">
+              admin@example.com / admin123
+            </p>
           </div>
         </form>
       </div>

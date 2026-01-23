@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { adminAPI } from "@/lib/api";
 
 export default function AdminPage() {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("hospitals");
   const [hospitals, setHospitals] = useState([]);
@@ -27,7 +27,7 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    if (!isAdmin && !loading) {
+    if (!isAdmin && !authLoading) {
       router.push("/dashboard");
       return;
     }
@@ -156,13 +156,21 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            管理者ダッシュボード
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            病院・施設アカウントの管理
-          </p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              管理者ダッシュボード
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              病院・施設アカウントの管理
+            </p>
+          </div>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            ダッシュボードに戻る
+          </button>
         </div>
 
         <div className="mb-6">

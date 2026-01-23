@@ -85,7 +85,7 @@ func (h *AdminHandler) CreateHospital(c *gin.Context) {
 }
 
 func (h *AdminHandler) ListHospitals(c *gin.Context) {
-	hospitals, err := h.hospitalRepo.GetAll()
+	hospitals, err := h.hospitalRepo.GetAllWithEmail()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve hospitals"})
 		return
@@ -200,7 +200,7 @@ func (h *AdminHandler) CreateFacility(c *gin.Context) {
 }
 
 func (h *AdminHandler) ListFacilities(c *gin.Context) {
-	facilities, err := h.facilityRepo.GetAll()
+	facilities, err := h.facilityRepo.GetAllWithEmail()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve facilities"})
 		return

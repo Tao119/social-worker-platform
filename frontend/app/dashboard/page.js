@@ -74,10 +74,16 @@ export default function DashboardPage() {
                   施設を検索
                 </a>
                 <a
-                  href="/documents"
+                  href="/requests"
                   className="block px-4 py-2 text-blue-600 hover:bg-blue-50 rounded"
                 >
-                  書類管理
+                  受け入れリクエスト管理
+                </a>
+                <a
+                  href="/rooms"
+                  className="block px-4 py-2 text-blue-600 hover:bg-blue-50 rounded"
+                >
+                  メッセージルーム
                 </a>
               </div>
             </div>
@@ -94,10 +100,16 @@ export default function DashboardPage() {
                   施設情報管理
                 </a>
                 <a
-                  href="/documents"
+                  href="/requests"
                   className="block px-4 py-2 text-blue-600 hover:bg-blue-50 rounded"
                 >
-                  書類管理
+                  受け入れリクエスト管理
+                </a>
+                <a
+                  href="/rooms"
+                  className="block px-4 py-2 text-blue-600 hover:bg-blue-50 rounded"
+                >
+                  メッセージルーム
                 </a>
               </div>
             </div>

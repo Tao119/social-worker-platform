@@ -2,7 +2,7 @@
 
 ## Introduction
 
-ソーシャルワーカー向けのwebアプリケーションは、病院と施設間の患者受け入れプロセスを効率化するためのプラットフォームです。病院側は適切な受け入れ施設を検索・閲覧でき、施設側は自施設の情報を登録・管理できます。両者間で書類の送受信が可能で、管理者が全体を統括します。
+ソーシャルワーカー向けのwebアプリケーションは、病院と施設間の患者受け入れプロセスを効率化するためのプラットフォームです。病院側は適切な受け入れ施設を検索・閲覧でき、患者ごとに受け入れリクエストを送信できます。施設側は自施設の情報を登録・管理し、受け入れリクエストを承認・拒否できます。承認後は専用のメッセージルームで詳細をすり合わせ、最終的な受け入れ判断を行います。管理者が全体を統括します。
 
 ## Glossary
 
@@ -11,7 +11,13 @@
 - **Facility_User**: 施設側のユーザーアカウント
 - **Admin_User**: 管理者アカウント
 - **Facility_Info**: 施設情報（病床数、受け入れ条件など）
-- **Document**: 病院と施設間で送受信される書類
+- **Placement_Request**: 病院から施設への患者受け入れリクエスト
+- **Patient_Summary**: 患者の基本情報（年齢、性別、医療状態）
+- **Message_Room**: 病院と施設間の1対1コミュニケーションルーム
+- **Room_ID**: メッセージルームの一意な識別子（UUID）
+- **Message**: メッセージルーム内のテキストメッセージ
+- **File_Attachment**: メッセージルーム内のファイル添付
+- **Room_Status**: メッセージルームの状態（pending, accepted, rejected）
 - **Authentication_System**: 認証システム
 - **Database**: PostgreSQLデータベース
 - **Frontend**: Next.js (JavaScript)で構築されたフロントエンド
@@ -56,20 +62,51 @@
 4. THE System SHALL prevent Facility_User from accessing the facility search functionality
 5. WHEN no facilities match the search criteria, THE System SHALL return an empty result set with an appropriate message
 
-### Requirement 4: 書類送受信機能
+### Requirement 4: 受け入れリクエストとメッセージルーム機能
 
-**User Story:** As a hospital or facility user, I want to send and receive documents securely, so that we can exchange necessary information for patient placement.
+**User Story:** As a hospital user, I want to send patient placement requests to facilities and communicate through a dedicated message room, so that we can coordinate patient placement efficiently.
 
 #### Acceptance Criteria
 
-1. WHEN a Hospital_User sends a document to a facility, THE System SHALL store the document and notify the Facility_User
-2. WHEN a Facility_User sends a document to a hospital, THE System SHALL store the document and notify the Hospital_User
-3. THE System SHALL associate each Document with the sender and recipient
-4. WHEN a user views their documents, THE System SHALL display all documents sent to or from that user
-5. THE System SHALL prevent unauthorized users from accessing documents they are not associated with
-6. THE System SHALL store document metadata including upload timestamp, sender, recipient, and document type
+1. WHEN a Hospital_User sends a placement request to a facility, THE System SHALL create a request with patient summary information (age, gender, medical condition)
+2. WHEN a placement request is created, THE System SHALL notify the Facility_User
+3. WHEN a Facility_User views a placement request, THE System SHALL display the patient summary information
+4. WHEN a Facility_User accepts a placement request, THE System SHALL create a unique message room for that hospital-facility-patient combination
+5. WHEN a Facility_User rejects a placement request, THE System SHALL mark the request as rejected and prevent further actions
+6. THE System SHALL generate a unique room ID (UUID) for each accepted placement request
+7. THE System SHALL associate each message room with exactly one hospital, one facility, and one patient
+8. WHEN multiple patients need placement, THE System SHALL require separate placement requests for each patient
+9. THE System SHALL prevent unauthorized users from accessing message rooms they are not associated with
 
-### Requirement 5: 管理者機能
+### Requirement 5: メッセージルーム内のコミュニケーション
+
+**User Story:** As a hospital or facility user in an active message room, I want to exchange messages and files, so that we can discuss patient placement details.
+
+#### Acceptance Criteria
+
+1. WHEN a message room is active, THE System SHALL allow both Hospital_User and Facility_User to send text messages
+2. WHEN a message room is active, THE System SHALL allow both Hospital_User and Facility_User to send file attachments
+3. WHEN a message is sent, THE System SHALL store the message with sender information and timestamp
+4. WHEN a file is sent, THE System SHALL store the file with metadata (sender, timestamp, file type, file name)
+5. WHEN a user views a message room, THE System SHALL display all messages and files in chronological order
+6. THE System SHALL prevent users from sending messages or files in rooms they are not associated with
+7. THE System SHALL display the final acceptance/rejection controls only to the Facility_User
+
+### Requirement 6: 最終受け入れ承認プロセス
+
+**User Story:** As a facility user, I want to make a final acceptance decision after discussing details, so that we can proceed with formal placement procedures or decline the request.
+
+#### Acceptance Criteria
+
+1. WHEN a Facility_User is in an active message room, THE System SHALL display final acceptance and rejection controls
+2. WHEN a Facility_User performs final acceptance, THE System SHALL mark the room as "accepted" and enable formal document exchange
+3. WHEN a Facility_User performs final rejection, THE System SHALL mark the room as "rejected" and close the room
+4. WHEN a room is closed (rejected), THE System SHALL prevent further message or file exchanges
+5. WHEN a room is accepted, THE System SHALL allow exchange of formal placement documents
+6. THE System SHALL prevent Hospital_User from accessing final acceptance/rejection controls
+7. THE System SHALL maintain room status (pending, accepted, rejected) throughout the lifecycle
+
+### Requirement 7: 管理者機能
 
 **User Story:** As an admin user, I want to manage hospital and facility accounts, so that I can maintain the platform and ensure data quality.
 
@@ -82,7 +119,7 @@
 5. THE System SHALL allow Admin_User to view all hospitals and facilities in the system
 6. THE System SHALL prevent non-admin users from accessing administrative functions
 
-### Requirement 6: データの永続化
+### Requirement 8: データの永続化
 
 **User Story:** As a system architect, I want all data to be stored in PostgreSQL, so that we have reliable and consistent data storage.
 
@@ -94,7 +131,7 @@
 4. THE Database SHALL enforce referential integrity between related entities
 5. THE System SHALL use prepared statements to prevent SQL injection attacks
 
-### Requirement 7: APIアーキテクチャ
+### Requirement 9: APIアーキテクチャ
 
 **User Story:** As a developer, I want a clear separation between frontend and backend, so that the system is maintainable and scalable.
 
@@ -106,7 +143,7 @@
 4. THE Backend SHALL validate all incoming request data before processing
 5. THE System SHALL use CORS configuration to allow Frontend to communicate with Backend
 
-### Requirement 8: セキュリティとデータ保護
+### Requirement 10: セキュリティとデータ保護
 
 **User Story:** As a system administrator, I want the system to protect sensitive data, so that we comply with privacy regulations and maintain user trust.
 

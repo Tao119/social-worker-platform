@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { facilityAPI } from "@/lib/api";
 
 export default function FacilityProfilePage() {
-  const { user, isFacility, loading } = useAuth();
+  const { user, isFacility, loading: authLoading } = useAuth();
   const router = useRouter();
   const [facility, setFacility] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +23,7 @@ export default function FacilityProfilePage() {
   });
 
   useEffect(() => {
-    if (!isFacility && !loading) {
+    if (!isFacility && !authLoading) {
       router.push("/dashboard");
       return;
     }
@@ -181,12 +181,18 @@ export default function FacilityProfilePage() {
                     </dd>
                   </div>
                 </dl>
-                <div className="mt-6">
+                <div className="mt-6 flex gap-2">
                   <button
                     onClick={() => setIsEditing(true)}
                     className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
                     編集
+                  </button>
+                  <button
+                    onClick={() => router.push("/dashboard")}
+                    className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    ダッシュボードに戻る
                   </button>
                 </div>
               </div>
@@ -308,6 +314,13 @@ export default function FacilityProfilePage() {
                       キャンセル
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/dashboard")}
+                    className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    ダッシュボードに戻る
+                  </button>
                 </div>
               </form>
             )}

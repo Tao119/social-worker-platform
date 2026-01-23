@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { facilityAPI } from "@/lib/api";
 
 export default function FacilityDetailPage() {
-  const { user, isHospital, loading } = useAuth();
+  const { user, isHospital, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
   const [facility, setFacility] = useState(null);
@@ -14,14 +14,14 @@ export default function FacilityDetailPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!isHospital && !loading) {
+    if (!isHospital && !authLoading) {
       router.push("/dashboard");
       return;
     }
     if (isHospital) {
       loadFacility();
     }
-  }, [isHospital, loading, router, params.id]);
+  }, [isHospital, authLoading, router, params.id]);
 
   const loadFacility = async () => {
     try {
@@ -81,11 +81,23 @@ export default function FacilityDetailPage() {
         </button>
 
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">
-              {facility.name}
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">施設詳細情報</p>
+          <div className="px-4 py-5 sm:px-6 flex justify-between items-start">
+            <div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                {facility.name}
+              </h3>
+              <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                施設詳細情報
+              </p>
+            </div>
+            <button
+              onClick={() =>
+                router.push(`/requests/create?facilityId=${facility.id}`)
+              }
+              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              受け入れリクエストを作成
+            </button>
           </div>
           <div className="border-t border-gray-200">
             <dl>

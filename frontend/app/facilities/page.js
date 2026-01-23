@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { facilityAPI } from "@/lib/api";
 
 export default function FacilitiesPage() {
-  const { user, isHospital, loading } = useAuth();
+  const { user, isHospital, loading: authLoading } = useAuth();
   const router = useRouter();
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,14 +18,14 @@ export default function FacilitiesPage() {
   });
 
   useEffect(() => {
-    if (!isHospital && !loading) {
+    if (!isHospital && !authLoading) {
       router.push("/dashboard");
       return;
     }
     if (isHospital) {
       loadFacilities();
     }
-  }, [isHospital, loading, router]);
+  }, [isHospital, authLoading, router]);
 
   const loadFacilities = async (params = {}) => {
     try {
@@ -66,11 +66,19 @@ export default function FacilitiesPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">施設検索</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            受け入れ可能な施設を検索できます
-          </p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">施設検索</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              受け入れ可能な施設を検索できます
+            </p>
+          </div>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            ダッシュボードに戻る
+          </button>
         </div>
 
         <div className="bg-white shadow rounded-lg p-6 mb-6">

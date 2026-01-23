@@ -18,6 +18,19 @@ type Facility struct {
 	UpdatedAt            time.Time `json:"updated_at"`
 }
 
+type FacilityWithEmail struct {
+	ID                   int       `json:"id"`
+	UserID               int       `json:"user_id"`
+	Email                string    `json:"email"`
+	Name                 string    `json:"name"`
+	Address              string    `json:"address"`
+	Phone                string    `json:"phone"`
+	BedCapacity          int       `json:"bed_capacity"`
+	AcceptanceConditions string    `json:"acceptance_conditions"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+}
+
 type FacilityRepository struct {
 	db *sql.DB
 }
@@ -150,6 +163,36 @@ func (r *FacilityRepository) GetAll() ([]*Facility, error) {
 	return facilities, nil
 }
 
+func (r *FacilityRepository) GetAllWithEmail() ([]*FacilityWithEmail, error) {
+	query := `
+		SELECT f.id, f.user_id, u.email, f.name, f.address, f.phone, f.bed_capacity, f.acceptance_conditions, f.created_at, f.updated_at
+		FROM facilities f
+		JOIN users u ON f.user_id = u.id
+		ORDER BY f.created_at DESC
+	`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get facilities: %w", err)
+	}
+	defer rows.Close()
+
+	facilities := []*FacilityWithEmail{}
+	for rows.Next() {
+		facility := &FacilityWithEmail{}
+		err := rows.Scan(
+			&facility.ID, &facility.UserID, &facility.Email, &facility.Name, &facility.Address,
+			&facility.Phone, &facility.BedCapacity, &facility.AcceptanceConditions,
+			&facility.CreatedAt, &facility.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan facility: %w", err)
+		}
+		facilities = append(facilities, facility)
+	}
+
+	return facilities, nil
+}
+
 func (r *FacilityRepository) Update(facility *Facility) error {
 	query := `
 		UPDATE facilities
@@ -190,4 +233,16 @@ func (r *FacilityRepository) Delete(id int) error {
 	}
 
 	return nil
+}
+
+// GetFacilityByID is a helper function for backward compatibility
+func GetFacilityByID(db *sql.DB, id int) (*Facility, error) {
+	repo := NewFacilityRepository(db)
+	return repo.GetByID(id)
+}
+
+// GetFacilityByUserID is a helper function for backward compatibility
+func GetFacilityByUserID(db *sql.DB, userID int) (*Facility, error) {
+	repo := NewFacilityRepository(db)
+	return repo.GetByUserID(userID)
 }

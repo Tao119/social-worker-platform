@@ -32,6 +32,7 @@ type CreateDocumentRequest struct {
 	RecipientID  int    `form:"recipient_id" binding:"required"`
 	Title        string `form:"title" binding:"required"`
 	DocumentType string `form:"document_type"`
+	Folder       string `form:"folder"`
 }
 
 func (h *DocumentHandler) Upload(c *gin.Context) {
@@ -71,6 +72,7 @@ func (h *DocumentHandler) Upload(c *gin.Context) {
 		req.Title,
 		filePath,
 		req.DocumentType,
+		req.Folder,
 	)
 	if err != nil {
 		os.Remove(filePath) // Clean up file if database insert fails
@@ -176,6 +178,48 @@ func (h *DocumentHandler) Download(c *gin.Context) {
 
 	// Stream file
 	io.Copy(c.Writer, file)
+}
+
+func (h *DocumentHandler) Delete(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid document ID"})
+		return
+	}
+
+	// Get document to check permissions and file path
+	document, err := h.documentRepo.GetByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Document not found"})
+		return
+	}
+
+	// Check if user has permission to delete (only sender can delete)
+	if document.SenderID != userID.(int) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You do not have permission to delete this document"})
+		return
+	}
+
+	// Delete file from filesystem
+	if err := os.Remove(document.FilePath); err != nil && !os.IsNotExist(err) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete file"})
+		return
+	}
+
+	// Delete document record from database
+	if err := h.documentRepo.Delete(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete document record"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Document deleted successfully"})
 }
 
 func getEnv(key, defaultValue string) string {

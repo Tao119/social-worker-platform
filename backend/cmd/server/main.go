@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"github.com/social-worker-platform/backend/config"
 	"github.com/social-worker-platform/backend/handlers"
 	"github.com/social-worker-platform/backend/middleware"
@@ -12,6 +13,11 @@ import (
 )
 
 func main() {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: .env file not found, using environment variables")
+	}
+
 	// Load configuration
 	dbConfig := &config.DatabaseConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
@@ -83,6 +89,36 @@ func main() {
 		documents.GET("", documentHandler.List)
 		documents.GET("/:id", documentHandler.GetByID)
 		documents.GET("/:id/download", documentHandler.Download)
+		documents.DELETE("/:id", documentHandler.Delete)
+	}
+
+	// Placement request routes
+	requests := router.Group("/api/requests")
+	requests.Use(middleware.AuthMiddleware())
+	{
+		requests.POST("", handlers.CreatePlacementRequest(db))
+		requests.GET("", handlers.GetPlacementRequests(db))
+		requests.GET("/:id", handlers.GetPlacementRequestByID(db))
+		requests.PUT("/:id", handlers.UpdatePlacementRequest(db))
+		requests.DELETE("/:id", handlers.CancelPlacementRequest(db))
+		requests.POST("/:id/accept", handlers.AcceptPlacementRequest(db))
+		requests.POST("/:id/reject", handlers.RejectPlacementRequest(db))
+	}
+
+	// Message room routes
+	rooms := router.Group("/api/rooms")
+	rooms.Use(middleware.AuthMiddleware())
+	{
+		rooms.GET("", handlers.GetMessageRooms(db))
+		rooms.GET("/:id", handlers.GetMessageRoomByID(db))
+		rooms.POST("/:id/messages", handlers.SendMessage(db))
+		rooms.POST("/:id/files", handlers.UploadRoomFile(db))
+		rooms.GET("/:id/files/:fileId", handlers.DownloadRoomFile(db))
+		rooms.DELETE("/:id/files/:fileId", handlers.DeleteRoomFile(db))
+		rooms.POST("/:id/accept", handlers.AcceptRoom(db))
+		rooms.POST("/:id/reject", handlers.RejectRoom(db))
+		rooms.POST("/:id/complete", handlers.CompleteRoom(db))
+		rooms.POST("/:id/cancel-completion", handlers.CancelCompletion(db))
 	}
 
 	// Admin routes

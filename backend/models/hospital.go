@@ -16,6 +16,17 @@ type Hospital struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type HospitalWithEmail struct {
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"name"`
+	Address   string    `json:"address"`
+	Phone     string    `json:"phone"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type HospitalRepository struct {
 	db *sql.DB
 }
@@ -112,6 +123,35 @@ func (r *HospitalRepository) GetAll() ([]*Hospital, error) {
 	return hospitals, nil
 }
 
+func (r *HospitalRepository) GetAllWithEmail() ([]*HospitalWithEmail, error) {
+	query := `
+		SELECT h.id, h.user_id, u.email, h.name, h.address, h.phone, h.created_at, h.updated_at
+		FROM hospitals h
+		JOIN users u ON h.user_id = u.id
+		ORDER BY h.created_at DESC
+	`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get hospitals: %w", err)
+	}
+	defer rows.Close()
+
+	hospitals := []*HospitalWithEmail{}
+	for rows.Next() {
+		hospital := &HospitalWithEmail{}
+		err := rows.Scan(
+			&hospital.ID, &hospital.UserID, &hospital.Email, &hospital.Name, &hospital.Address,
+			&hospital.Phone, &hospital.CreatedAt, &hospital.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan hospital: %w", err)
+		}
+		hospitals = append(hospitals, hospital)
+	}
+
+	return hospitals, nil
+}
+
 func (r *HospitalRepository) Update(hospital *Hospital) error {
 	query := `
 		UPDATE hospitals
@@ -150,4 +190,10 @@ func (r *HospitalRepository) Delete(id int) error {
 	}
 
 	return nil
+}
+
+// GetHospitalByUserID is a helper function for backward compatibility
+func GetHospitalByUserID(db *sql.DB, userID int) (*Hospital, error) {
+	repo := NewHospitalRepository(db)
+	return repo.GetByUserID(userID)
 }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-ソーシャルワーカープラットフォームは、Next.js (JavaScript) フロントエンド、Gin (Go) バックエンド、PostgreSQLデータベースを使用した3層アーキテクチャのwebアプリケーションです。病院と施設間の患者受け入れプロセスを効率化し、管理者が全体を統括します。
+ソーシャルワーカープラットフォームは、Next.js (JavaScript) フロントエンド、Gin (Go) バックエンド、PostgreSQLデータベースを使用した3層アーキテクチャのwebアプリケーションです。病院と施設間の患者受け入れプロセスを効率化し、患者ごとの受け入れリクエストから専用メッセージルームでのコミュニケーション、最終的な受け入れ判断までをサポートします。管理者が全体を統括します。
 
 ## Architecture
 
@@ -59,14 +59,18 @@
 
 - Facility search page with filters
 - Facility detail view
-- Document management (send/receive)
+- Placement request creation form
+- Message room list
+- Message room interface (messages and file exchange)
 - Dashboard
 
 #### 3. Facility User Interface
 
 - Facility information registration form
 - Facility information edit form
-- Document management (send/receive)
+- Placement request notifications and list
+- Message room list
+- Message room interface (messages, file exchange, final acceptance controls)
 - Dashboard
 
 #### 4. Admin User Interface
@@ -101,6 +105,28 @@ GET    /api/facilities/me       (Facility user: view own)
 POST   /api/documents           (Upload document)
 GET    /api/documents           (List user's documents)
 GET    /api/documents/:id       (View document details)
+```
+
+#### Placement Request Endpoints
+
+```
+POST   /api/requests            (Hospital: create placement request)
+GET    /api/requests            (List user's requests)
+GET    /api/requests/:id        (View request details)
+POST   /api/requests/:id/accept (Facility: accept request, create room)
+POST   /api/requests/:id/reject (Facility: reject request)
+```
+
+#### Message Room Endpoints
+
+```
+GET    /api/rooms               (List user's message rooms)
+GET    /api/rooms/:id           (View room details and messages)
+POST   /api/rooms/:id/messages  (Send text message)
+POST   /api/rooms/:id/files     (Send file attachment)
+GET    /api/rooms/:id/files/:fileId (Download file)
+POST   /api/rooms/:id/accept    (Facility: final acceptance)
+POST   /api/rooms/:id/reject    (Facility: final rejection)
 ```
 
 #### Admin Endpoints
@@ -185,6 +211,63 @@ CREATE TABLE documents (
 );
 ```
 
+### Placement Request Table
+
+```sql
+CREATE TABLE placement_requests (
+    id SERIAL PRIMARY KEY,
+    hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE,
+    facility_id INTEGER REFERENCES facilities(id) ON DELETE CASCADE,
+    patient_age INTEGER NOT NULL,
+    patient_gender VARCHAR(20) NOT NULL,
+    medical_condition TEXT NOT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Message Room Table
+
+```sql
+CREATE TABLE message_rooms (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    request_id INTEGER REFERENCES placement_requests(id) ON DELETE CASCADE UNIQUE,
+    hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE,
+    facility_id INTEGER REFERENCES facilities(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('active', 'accepted', 'rejected')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Message Table
+
+```sql
+CREATE TABLE messages (
+    id SERIAL PRIMARY KEY,
+    room_id UUID REFERENCES message_rooms(id) ON DELETE CASCADE,
+    sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    message_text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Room File Table
+
+```sql
+CREATE TABLE room_files (
+    id SERIAL PRIMARY KEY,
+    room_id UUID REFERENCES message_rooms(id) ON DELETE CASCADE,
+    sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_type VARCHAR(100),
+    file_size BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ### Indexes
 
 ```sql
@@ -194,6 +277,16 @@ CREATE INDEX idx_facilities_user_id ON facilities(user_id);
 CREATE INDEX idx_hospitals_user_id ON hospitals(user_id);
 CREATE INDEX idx_documents_sender ON documents(sender_id);
 CREATE INDEX idx_documents_recipient ON documents(recipient_id);
+CREATE INDEX idx_placement_requests_hospital ON placement_requests(hospital_id);
+CREATE INDEX idx_placement_requests_facility ON placement_requests(facility_id);
+CREATE INDEX idx_placement_requests_status ON placement_requests(status);
+CREATE INDEX idx_message_rooms_hospital ON message_rooms(hospital_id);
+CREATE INDEX idx_message_rooms_facility ON message_rooms(facility_id);
+CREATE INDEX idx_message_rooms_request ON message_rooms(request_id);
+CREATE INDEX idx_messages_room ON messages(room_id);
+CREATE INDEX idx_messages_sender ON messages(sender_id);
+CREATE INDEX idx_room_files_room ON room_files(room_id);
+CREATE INDEX idx_room_files_sender ON room_files(sender_id);
 ```
 
 ## Correctness Properties
@@ -275,105 +368,165 @@ _For any_ facility, when a hospital user views its details, the response should 
 _For any_ facility user, attempting to access the facility search endpoint should return an authorization error
 **Validates: Requirements 3.4**
 
-### Property 16: Document sending creates record
+### Property 16: Placement request stores complete patient data
 
-_For any_ document sent from a hospital to a facility (or vice versa), the document should be stored with correct sender_id and recipient_id
-**Validates: Requirements 4.1, 4.2, 4.3**
+_For any_ placement request created by a hospital, all patient summary fields (age, gender, medical condition) and facility association should be persisted and retrievable
+**Validates: Requirements 4.1, 4.3**
 
-### Property 17: Users can view their documents
+### Property 17: Placement request notification is created
 
-_For any_ user, retrieving their documents should return all documents where they are either the sender or recipient
-**Validates: Requirements 4.4**
+_For any_ placement request created, a notification record should be created for the facility user
+**Validates: Requirements 4.2**
 
-### Property 18: Document access is restricted
+### Property 18: Request acceptance creates unique room
 
-_For any_ document and any user who is neither the sender nor recipient, attempting to access the document should return an authorization error
+_For any_ placement request accepted by a facility, a message room with a unique UUID should be created and associated with the hospital, facility, and request
+**Validates: Requirements 4.4, 4.6**
+
+### Property 19: Request rejection prevents further actions
+
+_For any_ placement request rejected by a facility, the request status should be marked as rejected and subsequent room creation attempts should fail
 **Validates: Requirements 4.5**
 
-### Property 19: Document metadata is complete
+### Property 20: Room associations are complete
 
-_For any_ created document, it should have all metadata fields populated (upload timestamp, sender, recipient, document type)
-**Validates: Requirements 4.6**
+_For any_ message room, it should be associated with exactly one hospital, one facility, and one placement request (patient)
+**Validates: Requirements 4.7**
 
-### Property 20: Admin creates hospital accounts
+### Property 21: One request per patient
+
+_For any_ placement request, it should contain data for exactly one patient (not multiple patients)
+**Validates: Requirements 4.8**
+
+### Property 22: Room access is restricted
+
+_For any_ message room and any user not associated with that room (neither hospital nor facility), attempts to access the room should return an authorization error
+**Validates: Requirements 4.9**
+
+### Property 23: Active rooms allow message and file sending
+
+_For any_ active message room and any user associated with that room (hospital or facility), they should be able to send both text messages and file attachments
+**Validates: Requirements 5.1, 5.2**
+
+### Property 24: Messages and files have complete metadata
+
+_For any_ message or file sent in a room, it should have complete metadata including sender ID, timestamp, and content-specific fields (message text or file name/type/size)
+**Validates: Requirements 5.3, 5.4**
+
+### Property 25: Room content is chronologically ordered
+
+_For any_ message room, when retrieving messages and files, they should be ordered by creation timestamp (chronological order)
+**Validates: Requirements 5.5**
+
+### Property 26: Unauthorized sending is prevented
+
+_For any_ user not associated with a room, attempts to send messages or files should return an authorization error
+**Validates: Requirements 5.6**
+
+### Property 27: Final acceptance controls are facility-only
+
+_For any_ hospital user, attempts to perform final acceptance or rejection should return an authorization error
+**Validates: Requirements 5.7, 6.6**
+
+### Property 28: Final acceptance enables document exchange
+
+_For any_ message room where a facility user performs final acceptance, the room status should change to "accepted" and formal document exchange operations should be enabled
+**Validates: Requirements 6.2, 6.5**
+
+### Property 29: Final rejection closes room
+
+_For any_ message room where a facility user performs final rejection, the room status should change to "rejected" and further message/file exchanges should be prevented
+**Validates: Requirements 6.3, 6.4**
+
+### Property 30: Room status is valid
+
+_For any_ message room at any point in time, its status should be one of the valid values (active, accepted, rejected) and status transitions should follow the defined lifecycle
+**Validates: Requirements 6.7**
+
+### Property 31: Admin creates hospital accounts
 
 _For any_ valid hospital data submitted by an admin, both a user record (with role=hospital) and a hospital record should be created
 **Validates: Requirements 5.1**
 
-### Property 21: Admin creates facility accounts
+### Property 31: Admin creates hospital accounts
+
+_For any_ valid hospital data submitted by an admin, both a user record (with role=hospital) and a hospital record should be created
+**Validates: Requirements 7.1**
+
+### Property 32: Admin creates facility accounts
 
 _For any_ valid facility data submitted by an admin, both a user record (with role=facility) and a facility record should be created
-**Validates: Requirements 5.2**
-
-### Property 22: Admin updates are persisted
-
-_For any_ hospital or facility and any valid update data from an admin, the updates should be persisted and retrievable
-**Validates: Requirements 5.3**
-
-### Property 23: Account deletion marks inactive
-
-_For any_ account deleted by an admin, the account should be marked as inactive (is_active=false) and login attempts should fail
-**Validates: Requirements 5.4**
-
-### Property 24: Admin can view all entities
-
-_For any_ admin user, they should be able to retrieve lists of all hospitals and all facilities in the system
-**Validates: Requirements 5.5**
-
-### Property 25: Non-admins cannot access admin functions
-
-_For any_ non-admin user (hospital or facility), attempting to access admin endpoints should return an authorization error
-**Validates: Requirements 5.6**
-
-### Property 26: Data persistence round trip
-
-_For any_ data entity (user, hospital, facility, document), after creating it, retrieving it should return equivalent data
-**Validates: Requirements 6.1**
-
-### Property 27: Database errors return appropriate messages
-
-_For any_ database connection failure or query error, the API should return an appropriate error response (not crash)
-**Validates: Requirements 6.3**
-
-### Property 28: Referential integrity is enforced
-
-_For any_ user record, deleting it should cascade delete or prevent deletion if related records (hospital, facility, documents) exist
-**Validates: Requirements 6.4**
-
-### Property 29: API responses are valid JSON
-
-_For any_ API endpoint response, the response body should be valid JSON format
 **Validates: Requirements 7.2**
 
-### Property 30: Failed requests return proper status codes
+### Property 33: Admin updates are persisted
 
-_For any_ failed API request, the response should include an appropriate HTTP status code (4xx for client errors, 5xx for server errors) and an error message
+_For any_ hospital or facility and any valid update data from an admin, the updates should be persisted and retrievable
 **Validates: Requirements 7.3**
 
-### Property 31: Invalid input is rejected
+### Property 34: Account deletion marks inactive
 
-_For any_ API endpoint and any invalid input data, the request should be rejected with a validation error before processing
+_For any_ account deleted by an admin, the account should be marked as inactive (is_active=false) and login attempts should fail
 **Validates: Requirements 7.4**
 
-### Property 32: Passwords are encrypted
+### Property 35: Admin can view all entities
 
-_For any_ user account, the password stored in the database should be hashed (not plain text)
+_For any_ admin user, they should be able to retrieve lists of all hospitals and all facilities in the system
+**Validates: Requirements 7.5**
+
+### Property 36: Non-admins cannot access admin functions
+
+_For any_ non-admin user (hospital or facility), attempting to access admin endpoints should return an authorization error
+**Validates: Requirements 7.6**
+
+### Property 37: Data persistence round trip
+
+_For any_ data entity (user, hospital, facility, placement request, message room, message, file), after creating it, retrieving it should return equivalent data
 **Validates: Requirements 8.1**
 
-### Property 33: Session tokens are secure
+### Property 38: Database errors return appropriate messages
 
-_For any_ generated session token, it should be a valid JWT with proper signature and expiration
-**Validates: Requirements 8.2**
-
-### Property 34: Malicious input is sanitized
-
-_For any_ user input containing potentially malicious content (SQL injection, XSS), the system should sanitize or reject it
+_For any_ database connection failure or query error, the API should return an appropriate error response (not crash)
 **Validates: Requirements 8.3**
 
-### Property 35: Rate limiting prevents abuse
+### Property 39: Referential integrity is enforced
+
+_For any_ user record, deleting it should cascade delete or prevent deletion if related records (hospital, facility, requests, rooms) exist
+**Validates: Requirements 8.4**
+
+### Property 40: API responses are valid JSON
+
+_For any_ API endpoint response, the response body should be valid JSON format
+**Validates: Requirements 9.2**
+
+### Property 41: Failed requests return proper status codes
+
+_For any_ failed API request, the response should include an appropriate HTTP status code (4xx for client errors, 5xx for server errors) and an error message
+**Validates: Requirements 9.3**
+
+### Property 42: Invalid input is rejected
+
+_For any_ API endpoint and any invalid input data, the request should be rejected with a validation error before processing
+**Validates: Requirements 9.4**
+
+### Property 43: Passwords are encrypted
+
+_For any_ user account, the password stored in the database should be hashed (not plain text)
+**Validates: Requirements 10.1**
+
+### Property 44: Session tokens are secure
+
+_For any_ generated session token, it should be a valid JWT with proper signature and expiration
+**Validates: Requirements 10.2**
+
+### Property 45: Malicious input is sanitized
+
+_For any_ user input containing potentially malicious content (SQL injection, XSS), the system should sanitize or reject it
+**Validates: Requirements 10.3**
+
+### Property 46: Rate limiting prevents abuse
 
 _For any_ user making excessive requests in a short time period, subsequent requests should be rate limited with 429 status code
-**Validates: Requirements 8.5**
+**Validates: Requirements 10.5**
 
 ## Error Handling
 
