@@ -63,6 +63,10 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	// API Documentation routes
+	router.GET("/api/docs", handlers.ServeSwaggerUI)
+	router.GET("/api/docs/openapi.yaml", handlers.ServeOpenAPISpec)
+
 	// Authentication routes
 	auth := router.Group("/api/auth")
 	{
