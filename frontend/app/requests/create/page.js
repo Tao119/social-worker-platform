@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { facilityAPI, requestAPI } from "@/lib/api";
 import Link from "next/link";
 
-export default function CreateRequestPage() {
+function CreateRequestForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isHospital, loading: authLoading } = useAuth();
@@ -173,5 +173,19 @@ export default function CreateRequestPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateRequestPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-3xl mx-auto px-4">読み込み中...</div>
+        </div>
+      }
+    >
+      <CreateRequestForm />
+    </Suspense>
   );
 }
