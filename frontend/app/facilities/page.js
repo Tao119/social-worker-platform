@@ -13,7 +13,7 @@ export default function FacilitiesPage() {
   const [error, setError] = useState("");
   const [searchParams, setSearchParams] = useState({
     name: "",
-    minBeds: "",
+    hasAvailableBeds: false,
     location: "",
   });
 
@@ -44,14 +44,13 @@ export default function FacilitiesPage() {
     e.preventDefault();
     const params = {};
     if (searchParams.name) params.name = searchParams.name;
-    if (searchParams.minBeds)
-      params.min_bed_capacity = parseInt(searchParams.minBeds);
+    if (searchParams.hasAvailableBeds) params.has_available_beds = true;
     if (searchParams.location) params.address = searchParams.location;
     loadFacilities(params);
   };
 
   const handleReset = () => {
-    setSearchParams({ name: "", minBeds: "", location: "" });
+    setSearchParams({ name: "", hasAvailableBeds: false, location: "" });
     loadFacilities();
   };
 
@@ -103,26 +102,6 @@ export default function FacilitiesPage() {
               </div>
               <div>
                 <label
-                  htmlFor="minBeds"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  最小病床数
-                </label>
-                <input
-                  type="number"
-                  id="minBeds"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
-                  value={searchParams.minBeds}
-                  onChange={(e) =>
-                    setSearchParams({
-                      ...searchParams,
-                      minBeds: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <label
                   htmlFor="location"
                   className="block text-sm font-medium text-gray-700"
                 >
@@ -140,6 +119,29 @@ export default function FacilitiesPage() {
                     })
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  空き病床
+                </label>
+                <div className="mt-3">
+                  <label className="inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      checked={searchParams.hasAvailableBeds}
+                      onChange={(e) =>
+                        setSearchParams({
+                          ...searchParams,
+                          hasAvailableBeds: e.target.checked,
+                        })
+                      }
+                    />
+                    <span className="ml-2 text-sm text-gray-700">
+                      空きがある施設のみ
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
             <div className="flex gap-2">
@@ -190,6 +192,9 @@ export default function FacilitiesPage() {
                             <div className="sm:flex">
                               <p className="flex items-center text-sm text-gray-500">
                                 病床数: {facility.bed_capacity}床
+                              </p>
+                              <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                                空き病床: {facility.available_beds}床
                               </p>
                               {facility.address && (
                                 <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">

@@ -19,6 +19,7 @@ export default function FacilityProfilePage() {
     address: "",
     phone: "",
     bed_capacity: "",
+    available_beds: "",
     acceptance_conditions: "",
   });
 
@@ -43,6 +44,7 @@ export default function FacilityProfilePage() {
         address: response.data.address || "",
         phone: response.data.phone || "",
         bed_capacity: response.data.bed_capacity || "",
+        available_beds: response.data.available_beds || "",
         acceptance_conditions: response.data.acceptance_conditions || "",
       });
     } catch (err) {
@@ -68,6 +70,7 @@ export default function FacilityProfilePage() {
       const submitData = {
         ...formData,
         bed_capacity: parseInt(formData.bed_capacity) || 0,
+        available_beds: parseInt(formData.available_beds) || 0,
       };
 
       if (facility) {
@@ -93,6 +96,7 @@ export default function FacilityProfilePage() {
         address: facility.address || "",
         phone: facility.phone || "",
         bed_capacity: facility.bed_capacity || "",
+        available_beds: facility.available_beds || "",
         acceptance_conditions: facility.acceptance_conditions || "",
       });
       setIsEditing(false);
@@ -170,6 +174,14 @@ export default function FacilityProfilePage() {
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900">
                       {facility.bed_capacity}床
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">
+                      空き病床数
+                    </dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {facility.available_beds}床
                     </dd>
                   </div>
                   <div>
@@ -274,6 +286,32 @@ export default function FacilityProfilePage() {
                       })
                     }
                   />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="available_beds"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    現在の空き病床数 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="available_beds"
+                    required
+                    min="0"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                    value={formData.available_beds}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        available_beds: e.target.value,
+                      })
+                    }
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    現在受け入れ可能な病床数を入力してください
+                  </p>
                 </div>
 
                 <div>

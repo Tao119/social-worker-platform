@@ -33,13 +33,14 @@ type UpdateFacilityRequest struct {
 	Address              string `json:"address"`
 	Phone                string `json:"phone"`
 	BedCapacity          int    `json:"bed_capacity" binding:"min=0"`
+	AvailableBeds        int    `json:"available_beds" binding:"min=0"`
 	AcceptanceConditions string `json:"acceptance_conditions"`
 }
 
 type SearchFacilityRequest struct {
-	Name           string `form:"name"`
-	Address        string `form:"address"`
-	MinBedCapacity int    `form:"min_bed_capacity"`
+	Name              string `form:"name"`
+	Address           string `form:"address"`
+	HasAvailableBeds  bool   `form:"has_available_beds"`
 }
 
 func (h *FacilityHandler) Create(c *gin.Context) {
@@ -78,7 +79,7 @@ func (h *FacilityHandler) List(c *gin.Context) {
 		return
 	}
 
-	facilities, err := h.facilityRepo.Search(req.Name, req.Address, req.MinBedCapacity)
+	facilities, err := h.facilityRepo.Search(req.Name, req.Address, req.HasAvailableBeds)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve facilities"})
 		return
@@ -148,6 +149,9 @@ func (h *FacilityHandler) Update(c *gin.Context) {
 	}
 	if req.BedCapacity > 0 {
 		facility.BedCapacity = req.BedCapacity
+	}
+	if req.AvailableBeds >= 0 {
+		facility.AvailableBeds = req.AvailableBeds
 	}
 	if req.AcceptanceConditions != "" {
 		facility.AcceptanceConditions = req.AcceptanceConditions
