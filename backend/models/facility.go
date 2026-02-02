@@ -607,3 +607,104 @@ type FacilityImageInput struct {
 	ImageType string  `json:"image_type"`
 	Caption   *string `json:"caption,omitempty"`
 }
+
+// FacilityRoomType represents a room type with its capacity and availability
+type FacilityRoomType struct {
+	ID          int       `json:"id"`
+	FacilityID  int       `json:"facility_id"`
+	RoomType    string    `json:"room_type"`
+	Capacity    int       `json:"capacity"`
+	Available   int       `json:"available"`
+	MonthlyFee  *int      `json:"monthly_fee,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// FacilityRoomTypeInput represents input for creating/updating room types
+type FacilityRoomTypeInput struct {
+	RoomType    string  `json:"room_type" binding:"required"`
+	Capacity    int     `json:"capacity" binding:"required,min=1"`
+	Available   int     `json:"available" binding:"min=0"`
+	MonthlyFee  *int    `json:"monthly_fee,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+// GetRoomTypesByFacilityID returns all room types for a facility
+func (r *FacilityRepository) GetRoomTypesByFacilityID(facilityID int) ([]*FacilityRoomType, error) {
+	query := `
+		SELECT id, facility_id, room_type, capacity, available,
+		       monthly_fee, description, created_at, updated_at
+		FROM facility_room_types
+		WHERE facility_id = $1
+		ORDER BY room_type ASC
+	`
+	rows, err := r.db.Query(query, facilityID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get room types: %w", err)
+	}
+	defer rows.Close()
+
+	roomTypes := []*FacilityRoomType{}
+	for rows.Next() {
+		rt := &FacilityRoomType{}
+		err := rows.Scan(&rt.ID, &rt.FacilityID, &rt.RoomType, &rt.Capacity,
+			&rt.Available, &rt.MonthlyFee, &rt.Description, &rt.CreatedAt, &rt.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan room type: %w", err)
+		}
+		roomTypes = append(roomTypes, rt)
+	}
+
+	return roomTypes, nil
+}
+
+// UpdateRoomTypes replaces all room types for a facility
+func (r *FacilityRepository) UpdateRoomTypes(facilityID int, roomTypes []FacilityRoomTypeInput) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete existing room types for this facility
+	_, err = tx.Exec("DELETE FROM facility_room_types WHERE facility_id = $1", facilityID)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing room types: %w", err)
+	}
+
+	// Insert new room types
+	for _, rt := range roomTypes {
+		// Validate: available cannot exceed capacity
+		if rt.Available > rt.Capacity {
+			return fmt.Errorf("available (%d) cannot exceed capacity (%d) for room type '%s'",
+				rt.Available, rt.Capacity, rt.RoomType)
+		}
+
+		_, err = tx.Exec(`
+			INSERT INTO facility_room_types (facility_id, room_type, capacity, available, monthly_fee, description)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, facilityID, rt.RoomType, rt.Capacity, rt.Available, rt.MonthlyFee, rt.Description)
+		if err != nil {
+			return fmt.Errorf("failed to insert room type: %w", err)
+		}
+	}
+
+	// The trigger will automatically update facilities.available_beds
+	// But we also need to update bed_capacity
+	_, err = tx.Exec(`
+		UPDATE facilities SET
+			bed_capacity = (SELECT COALESCE(SUM(capacity), 0) FROM facility_room_types WHERE facility_id = $1),
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`, facilityID)
+	if err != nil {
+		return fmt.Errorf("failed to update facility bed_capacity: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}

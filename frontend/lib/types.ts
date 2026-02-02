@@ -57,6 +57,26 @@ export interface FacilityImage {
   created_at: string;
 }
 
+export interface FacilityRoomType {
+  id: number;
+  facility_id: number;
+  room_type: string;
+  capacity: number;
+  available: number;
+  monthly_fee?: number;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FacilityRoomTypeInput {
+  room_type: string;
+  capacity: number;
+  available: number;
+  monthly_fee?: number;
+  description?: string;
+}
+
 export interface FacilitySearchParams {
   name?: string;
   address?: string;

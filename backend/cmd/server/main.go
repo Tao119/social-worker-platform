@@ -84,6 +84,9 @@ func main() {
 		facilities.GET("/:id", middleware.AuthMiddleware(), middleware.RequireRole("hospital"), facilityHandler.GetByID)
 		facilities.PUT("/:id", middleware.AuthMiddleware(), middleware.RequireRole("facility", "admin"), facilityHandler.Update)
 		facilities.PUT("/:id/images", middleware.AuthMiddleware(), middleware.RequireRole("facility", "admin"), facilityHandler.UpdateImages)
+		// Room types routes
+		facilities.GET("/:id/room-types", middleware.AuthMiddleware(), middleware.RequireRole("hospital", "facility", "admin"), facilityHandler.GetRoomTypes)
+		facilities.PUT("/:id/room-types", middleware.AuthMiddleware(), middleware.RequireRole("facility", "admin"), facilityHandler.UpdateRoomTypes)
 	}
 
 	// Document routes

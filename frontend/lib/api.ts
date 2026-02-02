@@ -6,6 +6,8 @@ import type {
   FacilitySearchParams,
   FacilityCreateData,
   FacilityUpdateData,
+  FacilityRoomType,
+  FacilityRoomTypeInput,
   Hospital,
   HospitalCreateData,
   Document,
@@ -94,6 +96,16 @@ export const facilityAPI = {
     images: FacilityImageInput[]
   ): Promise<AxiosResponse<Facility>> =>
     api.put(`/api/facilities/${id}/images`, { images }),
+  // Room types API
+  getRoomTypes: (
+    id: number | string
+  ): Promise<AxiosResponse<FacilityRoomType[]>> =>
+    api.get(`/api/facilities/${id}/room-types`),
+  updateRoomTypes: (
+    id: number | string,
+    roomTypes: FacilityRoomTypeInput[]
+  ): Promise<AxiosResponse<FacilityRoomType[]>> =>
+    api.put(`/api/facilities/${id}/room-types`, { room_types: roomTypes }),
 };
 
 // Document API

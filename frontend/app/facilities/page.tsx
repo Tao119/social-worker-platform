@@ -787,7 +787,10 @@ function FacilitiesPageContent() {
                   if (!value) {
                     setSearchParams((prev) => ({ ...prev, sortBy: "", sortOrder: "asc" }));
                   } else {
-                    const [sortBy, sortOrder] = value.split("_");
+                    // Split from the last underscore to handle "available_beds_desc" correctly
+                    const lastUnderscoreIndex = value.lastIndexOf("_");
+                    const sortBy = value.substring(0, lastUnderscoreIndex);
+                    const sortOrder = value.substring(lastUnderscoreIndex + 1);
                     setSearchParams((prev) => ({ ...prev, sortBy, sortOrder }));
                   }
                   // Auto-search when sort changes
@@ -815,7 +818,10 @@ function FacilitiesPageContent() {
                     if (searchParams.pressureUlcer) params.pressure_ulcer = true;
                     if (searchParams.dementia) params.dementia = true;
                     if (value) {
-                      const [sortBy, sortOrder] = value.split("_");
+                      // Split from the last underscore to handle "available_beds_desc" correctly
+                      const lastUnderscoreIndex = value.lastIndexOf("_");
+                      const sortBy = value.substring(0, lastUnderscoreIndex);
+                      const sortOrder = value.substring(lastUnderscoreIndex + 1);
                       params.sort_by = sortBy as FacilitySearchParams["sort_by"];
                       params.sort_order = sortOrder as FacilitySearchParams["sort_order"];
                     }

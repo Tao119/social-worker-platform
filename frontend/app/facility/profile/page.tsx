@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { facilityAPI } from "@/lib/api";
 import PageLayout, { PageLoading, Card, Button, Alert } from "@/components/PageLayout";
 import DraggablePhotoGallery, { Photo } from "@/components/DraggablePhotoGallery";
-import type { Facility } from "@/lib/types";
+import type { Facility, FacilityRoomType, FacilityRoomTypeInput } from "@/lib/types";
 
 // Extended Facility type with additional fields used in the profile form
 interface FacilityWithExtras extends Facility {
@@ -120,6 +120,10 @@ export default function FacilityProfilePage() {
   const [careAreas, setCareAreas] = useState<Record<string, boolean>>({});
   const [acceptanceConditions, setAcceptanceConditions] = useState<Record<string, boolean>>({});
   const [photos, setPhotos] = useState<FacilityPhoto[]>([]);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeMessage, setGeocodeMessage] = useState("");
+  const [roomTypes, setRoomTypes] = useState<FacilityRoomTypeInput[]>([]);
+  const [loadingRoomTypes, setLoadingRoomTypes] = useState(false);
 
   useEffect(() => {
     if (!isFacility && !authLoading) {
@@ -175,6 +179,25 @@ export default function FacilityProfilePage() {
       } else if (data.photos) {
         setPhotos(data.photos);
       }
+
+      // Load room types
+      try {
+        setLoadingRoomTypes(true);
+        const roomTypesResponse = await facilityAPI.getRoomTypes(data.id);
+        const loadedRoomTypes = roomTypesResponse.data.map((rt: FacilityRoomType) => ({
+          room_type: rt.room_type,
+          capacity: rt.capacity,
+          available: rt.available,
+          monthly_fee: rt.monthly_fee,
+          description: rt.description,
+        }));
+        setRoomTypes(loadedRoomTypes);
+      } catch {
+        // Room types might not exist yet, that's ok
+        setRoomTypes([]);
+      } finally {
+        setLoadingRoomTypes(false);
+      }
     } catch (err) {
       const error = err as { response?: { status?: number; data?: { error?: string } } };
       if (error.response?.status !== 404) {
@@ -226,6 +249,11 @@ export default function FacilityProfilePage() {
 
         // Always update images (even if empty, to allow clearing all images)
         await facilityAPI.updateImages(facility.id, imageInputs);
+
+        // Save room types if any are defined
+        if (roomTypes.length > 0) {
+          await facilityAPI.updateRoomTypes(facility.id, roomTypes);
+        }
 
         setSuccess("施設情報を更新しました");
       } else {
@@ -283,6 +311,45 @@ export default function FacilityProfilePage() {
 
   const handlePhotosChange = (newPhotos: Photo[]) => {
     setPhotos(newPhotos);
+  };
+
+  const geocodeAddress = async () => {
+    if (!formData.address.trim()) {
+      setGeocodeMessage("住所を入力してください");
+      return;
+    }
+
+    setGeocoding(true);
+    setGeocodeMessage("");
+
+    try {
+      const encoded = encodeURIComponent(formData.address);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1&countrycodes=jp`,
+        {
+          headers: {
+            "User-Agent": "MSWApp/1.0",
+          },
+        }
+      );
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        setFormData({
+          ...formData,
+          latitude: parseFloat(lat).toFixed(6),
+          longitude: parseFloat(lon).toFixed(6),
+        });
+        setGeocodeMessage("座標を取得しました");
+      } else {
+        setGeocodeMessage("住所が見つかりませんでした。より詳細な住所を入力するか、手動で座標を設定してください。");
+      }
+    } catch {
+      setGeocodeMessage("座標の取得に失敗しました");
+    } finally {
+      setGeocoding(false);
+    }
   };
 
   if (!isFacility) {
@@ -348,19 +415,54 @@ export default function FacilityProfilePage() {
               </div>
               <div className="flex flex-col gap-2 md:col-span-2">
                 <label className="text-[#0d141b] text-sm font-bold">住所</label>
-                <div className="relative">
-                  <svg className="w-5 h-5 absolute left-3 top-3 text-[#4c739a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <input
-                    type="text"
-                    className="w-full pl-10 rounded-lg border-[#cfdbe7] border p-3 text-sm focus:ring-[#2b8cee] focus:border-[#2b8cee]"
-                    value={formData.address}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="東京都港区南青山1-2-3"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <svg className="w-5 h-5 absolute left-3 top-3 text-[#4c739a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      className="w-full pl-10 rounded-lg border-[#cfdbe7] border p-3 text-sm focus:ring-[#2b8cee] focus:border-[#2b8cee]"
+                      value={formData.address}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="東京都港区南青山1-2-3"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={geocodeAddress}
+                    disabled={geocoding}
+                    className="px-4 py-3 bg-[#2b8cee] text-white text-sm font-bold rounded-lg hover:bg-[#2074d4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  >
+                    {geocoding ? "取得中..." : "座標を取得"}
+                  </button>
                 </div>
+                {geocodeMessage && (
+                  <p className={`text-xs ${geocodeMessage.includes("取得しました") ? "text-green-600" : "text-amber-600"}`}>
+                    {geocodeMessage}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[#0d141b] text-sm font-bold">緯度</label>
+                <input
+                  type="text"
+                  className="w-full rounded-lg border-[#cfdbe7] border p-3 text-sm focus:ring-[#2b8cee] focus:border-[#2b8cee]"
+                  value={formData.latitude}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, latitude: e.target.value })}
+                  placeholder="35.681236"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[#0d141b] text-sm font-bold">経度</label>
+                <input
+                  type="text"
+                  className="w-full rounded-lg border-[#cfdbe7] border p-3 text-sm focus:ring-[#2b8cee] focus:border-[#2b8cee]"
+                  value={formData.longitude}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, longitude: e.target.value })}
+                  placeholder="139.767125"
+                />
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-[#0d141b] text-sm font-bold">施設種別</label>
@@ -387,6 +489,169 @@ export default function FacilityProfilePage() {
                 />
               </div>
             </div>
+          </section>
+
+          {/* Room Types Section */}
+          <section className="bg-white rounded-xl border border-[#e7edf3] p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-[#0d141b]">部屋種別と空き状況</h2>
+                <p className="text-sm text-[#4c739a] mt-1">
+                  部屋種別ごとに定員と空き状況を設定してください。空き数は定員を超えることはできません。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoomTypes([...roomTypes, { room_type: "", capacity: 0, available: 0 }])}
+                className="px-4 py-2 bg-[#2b8cee] text-white text-sm font-bold rounded-lg hover:bg-[#2074d4] transition-colors"
+              >
+                + 部屋種別を追加
+              </button>
+            </div>
+
+            {loadingRoomTypes ? (
+              <div className="text-center py-8 text-[#4c739a]">読み込み中...</div>
+            ) : roomTypes.length === 0 ? (
+              <div className="text-center py-8 text-[#4c739a] bg-slate-50 rounded-lg">
+                部屋種別が設定されていません。「部屋種別を追加」ボタンをクリックして追加してください。
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {roomTypes.map((rt, index) => (
+                  <div key={index} className="border border-[#e7edf3] rounded-lg p-4 bg-slate-50">
+                    <div className="flex items-start justify-between mb-4">
+                      <span className="text-sm font-bold text-[#4c739a]">部屋種別 {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => setRoomTypes(roomTypes.filter((_, i) => i !== index))}
+                        className="text-red-500 hover:text-red-700 text-sm"
+                      >
+                        削除
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div className="lg:col-span-1">
+                        <label className="text-xs font-bold text-[#4c739a] block mb-1">種別名</label>
+                        <select
+                          className="w-full rounded-lg border-[#cfdbe7] border p-2 text-sm focus:ring-[#2b8cee] focus:border-[#2b8cee]"
+                          value={rt.room_type}
+                          onChange={(e) => {
+                            const newRoomTypes = [...roomTypes];
+                            newRoomTypes[index].room_type = e.target.value;
+                            setRoomTypes(newRoomTypes);
+                          }}
+                        >
+                          <option value="">選択してください</option>
+                          <option value="個室">個室</option>
+                          <option value="2人部屋">2人部屋</option>
+                          <option value="4人部屋">4人部屋</option>
+                          <option value="多床室">多床室</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-[#4c739a] block mb-1">定員</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="w-full rounded-lg border-[#cfdbe7] border p-2 text-sm focus:ring-[#2b8cee] focus:border-[#2b8cee]"
+                          value={rt.capacity || ""}
+                          onChange={(e) => {
+                            const newRoomTypes = [...roomTypes];
+                            newRoomTypes[index].capacity = parseInt(e.target.value) || 0;
+                            // Ensure available doesn't exceed capacity
+                            if (newRoomTypes[index].available > newRoomTypes[index].capacity) {
+                              newRoomTypes[index].available = newRoomTypes[index].capacity;
+                            }
+                            setRoomTypes(newRoomTypes);
+                          }}
+                          placeholder="10"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-[#4c739a] block mb-1">空き</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={rt.capacity}
+                          className="w-full rounded-lg border-[#cfdbe7] border p-2 text-sm focus:ring-[#2b8cee] focus:border-[#2b8cee]"
+                          value={rt.available || ""}
+                          onChange={(e) => {
+                            const newRoomTypes = [...roomTypes];
+                            const value = parseInt(e.target.value) || 0;
+                            // Don't allow available to exceed capacity
+                            newRoomTypes[index].available = Math.min(value, rt.capacity);
+                            setRoomTypes(newRoomTypes);
+                          }}
+                          placeholder="2"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-[#4c739a] block mb-1">月額料金</label>
+                        <div className="relative">
+                          <span className="absolute left-2 top-2 text-[#4c739a] text-sm">¥</span>
+                          <input
+                            type="number"
+                            className="w-full pl-6 rounded-lg border-[#cfdbe7] border p-2 text-sm focus:ring-[#2b8cee] focus:border-[#2b8cee]"
+                            value={rt.monthly_fee || ""}
+                            onChange={(e) => {
+                              const newRoomTypes = [...roomTypes];
+                              newRoomTypes[index].monthly_fee = parseInt(e.target.value) || undefined;
+                              setRoomTypes(newRoomTypes);
+                            }}
+                            placeholder="180000"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-[#4c739a] block mb-1">使用率</label>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-slate-200 rounded-full h-6 overflow-hidden">
+                            <div
+                              className="h-full bg-[#2b8cee] transition-all"
+                              style={{
+                                width: rt.capacity > 0 ? `${((rt.capacity - rt.available) / rt.capacity) * 100}%` : "0%",
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs font-bold text-[#4c739a] w-12 text-right">
+                            {rt.capacity > 0 ? Math.round(((rt.capacity - rt.available) / rt.capacity) * 100) : 0}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {rt.available > rt.capacity && (
+                      <p className="text-xs text-red-500 mt-2">空き数は定員を超えることはできません</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Summary */}
+            {roomTypes.length > 0 && (
+              <div className="mt-6 p-4 bg-[#2b8cee]/5 rounded-lg">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <span className="text-xs text-[#4c739a] block">総定員</span>
+                    <span className="text-lg font-bold text-[#0d141b]">
+                      {roomTypes.reduce((sum, rt) => sum + (rt.capacity || 0), 0)}床
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-[#4c739a] block">空き合計</span>
+                    <span className="text-lg font-bold text-green-600">
+                      {roomTypes.reduce((sum, rt) => sum + (rt.available || 0), 0)}床
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-[#4c739a] block">使用中</span>
+                    <span className="text-lg font-bold text-[#0d141b]">
+                      {roomTypes.reduce((sum, rt) => sum + ((rt.capacity || 0) - (rt.available || 0)), 0)}床
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Care Areas Section */}

@@ -333,3 +333,74 @@ func (h *FacilityHandler) UpdateImages(c *gin.Context) {
 
 	c.JSON(http.StatusOK, updatedFacility)
 }
+
+// GetRoomTypes returns all room types for a facility
+func (h *FacilityHandler) GetRoomTypes(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid facility ID"})
+		return
+	}
+
+	roomTypes, err := h.facilityRepo.GetRoomTypesByFacilityID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get room types"})
+		return
+	}
+
+	c.JSON(http.StatusOK, roomTypes)
+}
+
+type UpdateRoomTypesRequest struct {
+	RoomTypes []models.FacilityRoomTypeInput `json:"room_types" binding:"required"`
+}
+
+// UpdateRoomTypes updates all room types for a facility
+func (h *FacilityHandler) UpdateRoomTypes(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid facility ID"})
+		return
+	}
+
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	userRole, _ := c.Get("userRole")
+
+	facility, err := h.facilityRepo.GetByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Facility not found"})
+		return
+	}
+
+	if userRole != "admin" && facility.UserID != userID.(int) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You do not have permission to update this facility"})
+		return
+	}
+
+	var req UpdateRoomTypesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format", "details": err.Error()})
+		return
+	}
+
+	if err := h.facilityRepo.UpdateRoomTypes(id, req.RoomTypes); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Return updated room types
+	roomTypes, err := h.facilityRepo.GetRoomTypesByFacilityID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated room types"})
+		return
+	}
+
+	c.JSON(http.StatusOK, roomTypes)
+}

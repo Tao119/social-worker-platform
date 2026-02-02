@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { facilityAPI } from "@/lib/api";
 import PageLayout, { PageLoading, PageError, Breadcrumb, Card, Button } from "@/components/PageLayout";
-import type { Facility } from "@/lib/types";
+import type { Facility, FacilityRoomType } from "@/lib/types";
 
 // Extended Facility type with additional fields used in the detail view
 interface FacilityWithExtras extends Facility {
@@ -84,6 +84,7 @@ export default function FacilityDetailPage() {
   const router = useRouter();
   const params = useParams();
   const [facility, setFacility] = useState<FacilityWithExtras | null>(null);
+  const [roomTypes, setRoomTypes] = useState<FacilityRoomType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -103,6 +104,15 @@ export default function FacilityDetailPage() {
       setError("");
       const response = await facilityAPI.getById(params.id as string);
       setFacility(response.data as FacilityWithExtras);
+
+      // Load room types
+      try {
+        const roomTypesResponse = await facilityAPI.getRoomTypes(params.id as string);
+        setRoomTypes(roomTypesResponse.data);
+      } catch {
+        // Room types might not exist yet
+        setRoomTypes([]);
+      }
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } } };
       setError(error.response?.data?.error || "施設情報の読み込みに失敗しました");
@@ -298,7 +308,9 @@ export default function FacilityDetailPage() {
                 </svg>
                 <h3 className="text-xl font-bold text-[#0d141b]">病床数</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <BedCard
                   title="総病床数"
                   value={facility?.bed_capacity || 0}
@@ -318,6 +330,55 @@ export default function FacilityDetailPage() {
                   subtitle="平均回答時間：24時間以内"
                 />
               </div>
+
+              {/* Room Types Breakdown */}
+              {roomTypes.length > 0 && (
+                <Card>
+                  <h4 className="text-sm font-bold text-[#4c739a] uppercase tracking-wider mb-4">
+                    部屋種別ごとの空き状況
+                  </h4>
+                  <div className="space-y-4">
+                    {roomTypes.map((rt) => {
+                      const occupancyRate = rt.capacity > 0 ? ((rt.capacity - rt.available) / rt.capacity) * 100 : 0;
+                      return (
+                        <div key={rt.id} className="flex items-center gap-4">
+                          <div className="w-24 shrink-0">
+                            <span className="font-bold text-sm text-[#0d141b]">{rt.room_type}</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-[#4c739a]">
+                                {rt.capacity - rt.available}/{rt.capacity}床 使用中
+                              </span>
+                              <span className={`text-xs font-bold ${rt.available > 0 ? "text-green-600" : "text-[#4c739a]"}`}>
+                                {rt.available > 0 ? `空き${rt.available}床` : "満床"}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                              <div
+                                className={`h-full transition-all rounded-full ${
+                                  occupancyRate >= 90 ? "bg-red-500" :
+                                  occupancyRate >= 70 ? "bg-amber-500" :
+                                  "bg-[#2b8cee]"
+                                }`}
+                                style={{ width: `${occupancyRate}%` }}
+                              />
+                            </div>
+                          </div>
+                          {rt.monthly_fee && (
+                            <div className="w-28 text-right shrink-0">
+                              <span className="text-sm font-bold text-[#2b8cee]">
+                                ¥{rt.monthly_fee.toLocaleString()}
+                              </span>
+                              <span className="text-xs text-[#4c739a]">/月</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
             </section>
 
             {/* Acceptance Conditions Section */}
@@ -357,6 +418,9 @@ export default function FacilityDetailPage() {
                         部屋タイプ
                       </th>
                       <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-[#4c739a]">
+                        定員
+                      </th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-[#4c739a]">
                         月額料金 (概算)
                       </th>
                       <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-[#4c739a]">
@@ -365,19 +429,39 @@ export default function FacilityDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    <tr>
-                      <td className="px-6 py-4 font-bold text-sm text-[#0d141b]">多床室（相部屋）</td>
-                      <td className="px-6 py-4 font-bold text-[#2b8cee]">
-                        {facility?.monthly_fee
-                          ? `¥${facility.monthly_fee.toLocaleString()} 〜`
-                          : "お問い合わせください"}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-bold">
-                        <span className={hasAvailableBeds ? "text-green-600" : "text-[#4c739a]"}>
-                          {hasAvailableBeds ? `${facility?.available_beds}床 空きあり` : "満床"}
-                        </span>
-                      </td>
-                    </tr>
+                    {roomTypes.length > 0 ? (
+                      roomTypes.map((rt) => (
+                        <tr key={rt.id}>
+                          <td className="px-6 py-4 font-bold text-sm text-[#0d141b]">{rt.room_type}</td>
+                          <td className="px-6 py-4 text-sm text-[#4c739a]">{rt.capacity}床</td>
+                          <td className="px-6 py-4 font-bold text-[#2b8cee]">
+                            {rt.monthly_fee
+                              ? `¥${rt.monthly_fee.toLocaleString()}`
+                              : "お問い合わせ"}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-bold">
+                            <span className={rt.available > 0 ? "text-green-600" : "text-[#4c739a]"}>
+                              {rt.available > 0 ? `${rt.available}床 空きあり` : "満床"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="px-6 py-4 font-bold text-sm text-[#0d141b]">多床室（相部屋）</td>
+                        <td className="px-6 py-4 text-sm text-[#4c739a]">{facility?.bed_capacity || 0}床</td>
+                        <td className="px-6 py-4 font-bold text-[#2b8cee]">
+                          {facility?.monthly_fee
+                            ? `¥${facility.monthly_fee.toLocaleString()} 〜`
+                            : "お問い合わせください"}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-bold">
+                          <span className={hasAvailableBeds ? "text-green-600" : "text-[#4c739a]"}>
+                            {hasAvailableBeds ? `${facility?.available_beds}床 空きあり` : "満床"}
+                          </span>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
                 <div className="p-4 bg-slate-50 border-t border-[#cfdbe7]">
