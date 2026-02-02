@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { requestAPI, facilityAPI } from "@/lib/api";
 import Sidebar from "@/components/Sidebar";
-import type { PlacementRequest, Facility } from "@/lib/types";
+import type { PlacementRequest, Facility, FacilityRoomType, FacilityRoomTypeInput } from "@/lib/types";
 
 interface SearchFilters {
   keyword: string;
@@ -116,13 +116,14 @@ interface FacilityDashboardProps {
 
 function FacilityDashboard({ router }: FacilityDashboardProps) {
   const [facility, setFacility] = useState<Facility | null>(null);
-  const [availableBeds, setAvailableBeds] = useState<string>("");
-  const [originalBeds, setOriginalBeds] = useState<string>("");
+  const [roomTypes, setRoomTypes] = useState<FacilityRoomTypeInput[]>([]);
+  const [originalRoomTypes, setOriginalRoomTypes] = useState<FacilityRoomTypeInput[]>([]);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+  const [loadingRoomTypes, setLoadingRoomTypes] = useState(true);
 
-  const hasChanges = availableBeds !== originalBeds;
+  const hasChanges = JSON.stringify(roomTypes) !== JSON.stringify(originalRoomTypes);
 
   useEffect(() => {
     loadFacility();
@@ -133,39 +134,64 @@ function FacilityDashboard({ router }: FacilityDashboardProps) {
       const response = await facilityAPI.getMy();
       const data = response.data as Facility;
       setFacility(data);
-      const beds = data.available_beds?.toString() || "0";
-      setAvailableBeds(beds);
-      setOriginalBeds(beds);
+
+      // Load room types
+      try {
+        setLoadingRoomTypes(true);
+        const roomTypesResponse = await facilityAPI.getRoomTypes(data.id);
+        const loadedRoomTypes = roomTypesResponse.data.map((rt: FacilityRoomType) => ({
+          room_type: rt.room_type,
+          capacity: rt.capacity,
+          available: rt.available,
+          monthly_fee: rt.monthly_fee,
+          description: rt.description,
+        }));
+        setRoomTypes(loadedRoomTypes);
+        setOriginalRoomTypes(loadedRoomTypes);
+      } catch {
+        setRoomTypes([]);
+        setOriginalRoomTypes([]);
+      } finally {
+        setLoadingRoomTypes(false);
+      }
     } catch {
       // Facility might not exist yet
+      setLoadingRoomTypes(false);
     }
   };
 
-  const handleUpdateBeds = async () => {
+  const handleUpdateRoomTypes = async () => {
     if (!facility) return;
     setSaving(true);
     setError("");
     setSuccess("");
 
     try {
-      await facilityAPI.update(facility.id, {
-        available_beds: parseInt(availableBeds) || 0,
-      });
-      setOriginalBeds(availableBeds);
-      setSuccess("空床数を更新しました");
+      await facilityAPI.updateRoomTypes(facility.id, roomTypes);
+      setOriginalRoomTypes([...roomTypes]);
+      // Reload facility to get updated available_beds
+      const response = await facilityAPI.getMy();
+      setFacility(response.data as Facility);
+      setSuccess("空き状況を更新しました");
       setTimeout(() => setSuccess(""), 3000);
-    } catch {
-      setError("更新に失敗しました");
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || "更新に失敗しました");
     } finally {
       setSaving(false);
     }
   };
 
-  const adjustBeds = (delta: number) => {
-    const current = parseInt(availableBeds) || 0;
-    const newValue = Math.max(0, current + delta);
-    setAvailableBeds(newValue.toString());
+  const adjustAvailable = (index: number, delta: number) => {
+    const newRoomTypes = [...roomTypes];
+    const current = newRoomTypes[index].available;
+    const newValue = Math.max(0, Math.min(newRoomTypes[index].capacity, current + delta));
+    newRoomTypes[index] = { ...newRoomTypes[index], available: newValue };
+    setRoomTypes(newRoomTypes);
   };
+
+  const totalCapacity = roomTypes.reduce((sum, rt) => sum + rt.capacity, 0);
+  const totalAvailable = roomTypes.reduce((sum, rt) => sum + rt.available, 0);
 
   return (
     <div className="flex min-h-screen bg-[#f6f7f8]">
@@ -178,56 +204,128 @@ function FacilityDashboard({ router }: FacilityDashboardProps) {
           </div>
         </div>
         <div className="px-8 py-8 max-w-6xl mx-auto">
-          {/* Quick Bed Update Section */}
+          {/* Room Types Quick Update Section */}
           {facility && (
             <div className="bg-white p-6 rounded-xl border border-[#cfdbe7] shadow-sm mb-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-[#0d141b] mb-1">空床数 クイック更新</h3>
+                  <h3 className="text-lg font-bold text-[#0d141b] mb-1">空き状況 クイック更新</h3>
                   <p className="text-sm text-[#4c739a]">
-                    総定員: {facility.bed_capacity}床
+                    部屋種別ごとに空き数を更新できます
                   </p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => adjustBeds(-1)}
-                      className="size-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-[#0d141b] font-bold text-xl transition-colors"
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      value={availableBeds}
-                      onChange={(e) => setAvailableBeds(e.target.value)}
-                      className={`w-20 text-center text-2xl font-bold border rounded-lg py-2 focus:ring-[#2b8cee] focus:border-[#2b8cee] ${
-                        hasChanges
-                          ? "text-[#2b8cee] border-[#2b8cee] bg-[#2b8cee]/5"
-                          : "text-[#4c739a] border-[#cfdbe7]"
-                      }`}
-                      min="0"
-                      max={facility.bed_capacity}
-                    />
-                    <button
-                      onClick={() => adjustBeds(1)}
-                      className="size-10 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-[#0d141b] font-bold text-xl transition-colors"
-                    >
-                      +
-                    </button>
-                  </div>
+                <button
+                  onClick={handleUpdateRoomTypes}
+                  disabled={saving || !hasChanges || roomTypes.length === 0}
+                  className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-colors disabled:opacity-50 ${
+                    hasChanges && roomTypes.length > 0
+                      ? "bg-[#2b8cee] text-white hover:bg-[#2b8cee]/90"
+                      : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  }`}
+                >
+                  {saving ? "更新中..." : "保存"}
+                </button>
+              </div>
+
+              {loadingRoomTypes ? (
+                <div className="text-center py-8">
+                  <svg className="animate-spin h-8 w-8 text-[#2b8cee] mx-auto" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+              ) : roomTypes.length === 0 ? (
+                <div className="text-center py-6 bg-slate-50 rounded-lg">
+                  <p className="text-[#4c739a] mb-3">部屋種別が設定されていません</p>
                   <button
-                    onClick={handleUpdateBeds}
-                    disabled={saving || !hasChanges}
-                    className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-colors disabled:opacity-50 ${
-                      hasChanges
-                        ? "bg-[#2b8cee] text-white hover:bg-[#2b8cee]/90"
-                        : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                    }`}
+                    onClick={() => router.push("/facility/profile")}
+                    className="text-[#2b8cee] text-sm font-bold hover:underline"
                   >
-                    {saving ? "更新中..." : "更新"}
+                    施設情報管理で設定する →
                   </button>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  {roomTypes.map((rt, index) => {
+                    const occupancyRate = rt.capacity > 0 ? ((rt.capacity - rt.available) / rt.capacity) * 100 : 0;
+                    return (
+                      <div key={index} className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg">
+                        <div className="w-20 shrink-0">
+                          <span className="font-bold text-sm text-[#0d141b]">{rt.room_type}</span>
+                          <p className="text-[10px] text-[#4c739a]">定員 {rt.capacity}床</p>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-[#4c739a]">
+                              {rt.capacity - rt.available}/{rt.capacity}床 使用中
+                            </span>
+                            <span className={`text-xs font-bold ${rt.available > 0 ? "text-green-600" : "text-[#4c739a]"}`}>
+                              {rt.available > 0 ? `空き${rt.available}床` : "満床"}
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-full transition-all rounded-full ${
+                                occupancyRate >= 90 ? "bg-red-500" :
+                                occupancyRate >= 70 ? "bg-amber-500" :
+                                "bg-[#2b8cee]"
+                              }`}
+                              style={{ width: `${occupancyRate}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => adjustAvailable(index, -1)}
+                            disabled={rt.available <= 0}
+                            className="size-8 rounded-lg bg-white border border-[#cfdbe7] hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-[#0d141b] font-bold transition-colors"
+                          >
+                            −
+                          </button>
+                          <span className={`w-10 text-center font-bold ${
+                            rt.available !== originalRoomTypes[index]?.available
+                              ? "text-[#2b8cee]"
+                              : "text-[#0d141b]"
+                          }`}>
+                            {rt.available}
+                          </span>
+                          <button
+                            onClick={() => adjustAvailable(index, 1)}
+                            disabled={rt.available >= rt.capacity}
+                            className="size-8 rounded-lg bg-white border border-[#cfdbe7] hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-[#0d141b] font-bold transition-colors"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Summary */}
+                  <div className="flex items-center justify-between pt-3 border-t border-[#cfdbe7] mt-4">
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <span className="text-xs text-[#4c739a] block">総定員</span>
+                        <span className="font-bold text-[#0d141b]">{totalCapacity}床</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-[#4c739a] block">空き合計</span>
+                        <span className="font-bold text-green-600">{totalAvailable}床</span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-[#4c739a] block">使用中</span>
+                        <span className="font-bold text-[#0d141b]">{totalCapacity - totalAvailable}床</span>
+                      </div>
+                    </div>
+                    {hasChanges && (
+                      <span className="text-xs text-[#2b8cee] font-bold animate-pulse">
+                        変更があります
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {success && (
                 <div className="mt-3 text-sm text-emerald-600 bg-emerald-50 px-3 py-2 rounded-lg">
                   {success}
