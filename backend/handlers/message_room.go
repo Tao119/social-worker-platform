@@ -32,19 +32,21 @@ func GetMessageRooms(db *sql.DB) gin.HandlerFunc {
 		var err error
 
 		if role == "hospital" {
-			hospital, err := models.GetHospitalByUserID(db, userID.(int))
+			var hospital *models.Hospital
+			hospital, err = models.GetHospitalByUserID(db, userID.(int))
 			if err != nil || hospital == nil {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Hospital not found"})
 				return
 			}
-			rooms, err = models.GetMessageRoomsByHospitalID(db, hospital.ID)
+			rooms, err = models.GetMessageRoomsByHospitalID(db, hospital.ID, userID.(int))
 		} else if role == "facility" {
-			facility, err := models.GetFacilityByUserID(db, userID.(int))
+			var facility *models.Facility
+			facility, err = models.GetFacilityByUserID(db, userID.(int))
 			if err != nil || facility == nil {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Facility not found"})
 				return
 			}
-			rooms, err = models.GetMessageRoomsByFacilityID(db, facility.ID)
+			rooms, err = models.GetMessageRoomsByFacilityID(db, facility.ID, userID.(int))
 		} else {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid role"})
 			return
@@ -204,6 +206,9 @@ func SendMessage(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Mark room as read for the sender (so their own messages don't show as unread)
+		models.MarkRoomAsRead(db, roomID, userID.(int))
+
 		c.JSON(http.StatusCreated, message)
 	}
 }
@@ -301,6 +306,9 @@ func UploadRoomFile(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Mark room as read for the sender (so their own files don't show as unread)
+		models.MarkRoomAsRead(db, roomID, userID.(int))
+
 		c.JSON(http.StatusCreated, roomFile)
 	}
 }
@@ -382,6 +390,109 @@ func DownloadRoomFile(db *sql.DB) gin.HandlerFunc {
 		c.Header("Content-Transfer-Encoding", "binary")
 		c.Header("Content-Disposition", "attachment; filename="+file.FileName)
 		c.Header("Content-Type", "application/octet-stream")
+
+		// Stream file
+		io.Copy(c.Writer, f)
+	}
+}
+
+// PreviewRoomFile handles GET /api/rooms/:id/files/:fileId/preview
+func PreviewRoomFile(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := c.Get("userID")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			return
+		}
+
+		role, exists := c.Get("userRole")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Role not found"})
+			return
+		}
+
+		roomID := c.Param("id")
+		fileID, err := strconv.Atoi(c.Param("fileId"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file ID"})
+			return
+		}
+
+		room, err := models.GetMessageRoomByID(db, roomID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve room"})
+			return
+		}
+
+		if room == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+			return
+		}
+
+		// Check authorization
+		authorized := false
+		if role == "hospital" {
+			hospital, err := models.GetHospitalByUserID(db, userID.(int))
+			if err == nil && hospital != nil && hospital.ID == room.HospitalID {
+				authorized = true
+			}
+		} else if role == "facility" {
+			facility, err := models.GetFacilityByUserID(db, userID.(int))
+			if err == nil && facility != nil && facility.ID == room.FacilityID {
+				authorized = true
+			}
+		}
+
+		if !authorized {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+
+		// Get file record
+		file, err := models.GetRoomFileByID(db, fileID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve file"})
+			return
+		}
+
+		if file == nil || file.RoomID != roomID {
+			c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+			return
+		}
+
+		// Open file
+		f, err := os.Open(file.FilePath)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "File not found on disk"})
+			return
+		}
+		defer f.Close()
+
+		// Determine content type based on file extension
+		ext := filepath.Ext(file.FileName)
+		contentType := "application/octet-stream"
+		switch ext {
+		case ".pdf":
+			contentType = "application/pdf"
+		case ".jpg", ".jpeg":
+			contentType = "image/jpeg"
+		case ".png":
+			contentType = "image/png"
+		case ".gif":
+			contentType = "image/gif"
+		case ".webp":
+			contentType = "image/webp"
+		case ".svg":
+			contentType = "image/svg+xml"
+		}
+
+		// Mark room as read for the viewer (viewing file clears unread)
+		models.MarkRoomAsRead(db, roomID, userID.(int))
+
+		// Set headers for inline display (preview)
+		c.Header("Content-Type", contentType)
+		c.Header("Content-Disposition", "inline; filename="+file.FileName)
+		c.Header("Cache-Control", "private, max-age=3600")
 
 		// Stream file
 		io.Copy(c.Writer, f)

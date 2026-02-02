@@ -83,6 +83,7 @@ func main() {
 		facilities.GET("/me", middleware.AuthMiddleware(), middleware.RequireRole("facility"), facilityHandler.GetMyFacility)
 		facilities.GET("/:id", middleware.AuthMiddleware(), middleware.RequireRole("hospital"), facilityHandler.GetByID)
 		facilities.PUT("/:id", middleware.AuthMiddleware(), middleware.RequireRole("facility", "admin"), facilityHandler.Update)
+		facilities.PUT("/:id/images", middleware.AuthMiddleware(), middleware.RequireRole("facility", "admin"), facilityHandler.UpdateImages)
 	}
 
 	// Document routes
@@ -96,6 +97,9 @@ func main() {
 		documents.DELETE("/:id", documentHandler.Delete)
 	}
 
+	// Unread counts route
+	router.GET("/api/unread", middleware.AuthMiddleware(), handlers.GetUnreadCounts(db))
+
 	// Placement request routes
 	requests := router.Group("/api/requests")
 	requests.Use(middleware.AuthMiddleware())
@@ -107,6 +111,8 @@ func main() {
 		requests.DELETE("/:id", handlers.CancelPlacementRequest(db))
 		requests.POST("/:id/accept", handlers.AcceptPlacementRequest(db))
 		requests.POST("/:id/reject", handlers.RejectPlacementRequest(db))
+		requests.POST("/:id/read", handlers.MarkRequestAsRead(db))
+		requests.POST("/read-all", handlers.MarkAllRequestsAsRead(db))
 	}
 
 	// Message room routes
@@ -118,11 +124,13 @@ func main() {
 		rooms.POST("/:id/messages", handlers.SendMessage(db))
 		rooms.POST("/:id/files", handlers.UploadRoomFile(db))
 		rooms.GET("/:id/files/:fileId", handlers.DownloadRoomFile(db))
+		rooms.GET("/:id/files/:fileId/preview", handlers.PreviewRoomFile(db))
 		rooms.DELETE("/:id/files/:fileId", handlers.DeleteRoomFile(db))
 		rooms.POST("/:id/accept", handlers.AcceptRoom(db))
 		rooms.POST("/:id/reject", handlers.RejectRoom(db))
 		rooms.POST("/:id/complete", handlers.CompleteRoom(db))
 		rooms.POST("/:id/cancel-completion", handlers.CancelCompletion(db))
+		rooms.POST("/:id/read", handlers.MarkRoomAsRead(db))
 	}
 
 	// Admin routes

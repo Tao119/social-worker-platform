@@ -9,6 +9,12 @@
 go.work
 vendor/
 backend/tmp/
+backend/main
+
+# Local-only files (not pushed to remote)
+.local/
+.kiro/
+.playwright-mcp/
 
 # Node.js
 node_modules/
@@ -47,3 +53,5 @@ logs/
 
 # Uploads
 uploads/
+
+design/

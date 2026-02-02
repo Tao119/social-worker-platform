@@ -66,6 +66,9 @@ func CreatePlacementRequest(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Mark request as read for the creator (so their own request doesn't show as unread)
+		models.MarkRequestAsRead(db, placementReq.ID, userID.(int))
+
 		c.JSON(http.StatusCreated, placementReq)
 	}
 }
@@ -242,6 +245,9 @@ func AcceptPlacementRequest(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Mark request as read for the facility user (so their own action doesn't show as unread)
+		models.MarkRequestAsRead(db, id, userID.(int))
+
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Request accepted",
 			"room_id": room.ID,
@@ -299,6 +305,9 @@ func RejectPlacementRequest(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject request"})
 			return
 		}
+
+		// Mark request as read for the facility user (so their own action doesn't show as unread)
+		models.MarkRequestAsRead(db, id, userID.(int))
 
 		c.JSON(http.StatusOK, gin.H{"message": "Request rejected"})
 	}

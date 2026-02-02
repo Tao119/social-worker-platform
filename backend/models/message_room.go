@@ -20,6 +20,10 @@ type MessageRoom struct {
 	MedicalCondition    string    `json:"medical_condition,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
+	// For room list view
+	LatestMessage       string    `json:"latest_message,omitempty"`
+	LatestMessageAt     *time.Time `json:"latest_message_at,omitempty"`
+	HasUnread           bool      `json:"has_unread"`
 }
 
 // CreateMessageRoom creates a new message room
@@ -40,13 +44,23 @@ func CreateMessageRoom(db *sql.DB, room *MessageRoom) error {
 	return err
 }
 
-// GetMessageRoomByID retrieves a message room by ID
+// GetMessageRoomByID retrieves a message room by ID with patient info
 func GetMessageRoomByID(db *sql.DB, id string) (*MessageRoom, error) {
 	room := &MessageRoom{}
 	query := `
-		SELECT id, request_id, hospital_id, facility_id, status, hospital_completed, facility_completed, created_at, updated_at
-		FROM message_rooms
-		WHERE id = $1
+		SELECT
+			mr.id, mr.request_id, mr.hospital_id, mr.facility_id, mr.status,
+			mr.hospital_completed, mr.facility_completed, mr.created_at, mr.updated_at,
+			h.name as hospital_name,
+			f.name as facility_name,
+			COALESCE(pr.patient_age, 0) as patient_age,
+			COALESCE(pr.patient_gender, '') as patient_gender,
+			COALESCE(pr.medical_condition, '') as medical_condition
+		FROM message_rooms mr
+		JOIN hospitals h ON mr.hospital_id = h.id
+		JOIN facilities f ON mr.facility_id = f.id
+		LEFT JOIN placement_requests pr ON mr.request_id = pr.id
+		WHERE mr.id = $1
 	`
 	err := db.QueryRow(query, id).Scan(
 		&room.ID,
@@ -58,12 +72,17 @@ func GetMessageRoomByID(db *sql.DB, id string) (*MessageRoom, error) {
 		&room.FacilityCompleted,
 		&room.CreatedAt,
 		&room.UpdatedAt,
+		&room.HospitalName,
+		&room.FacilityName,
+		&room.PatientAge,
+		&room.PatientGender,
+		&room.MedicalCondition,
 	)
-	
+
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	
+
 	return room, err
 }
 
@@ -92,33 +111,53 @@ func GetMessageRoomByRequestID(db *sql.DB, requestID int) (*MessageRoom, error) 
 	return room, err
 }
 
-// GetMessageRoomsByHospitalID retrieves all message rooms for a hospital
-func GetMessageRoomsByHospitalID(db *sql.DB, hospitalID int) ([]*MessageRoom, error) {
+// GetMessageRoomsByHospitalID retrieves all message rooms for a hospital with latest message and unread status
+func GetMessageRoomsByHospitalID(db *sql.DB, hospitalID int, userID int) ([]*MessageRoom, error) {
 	query := `
-		SELECT 
-			mr.id, mr.request_id, mr.hospital_id, mr.facility_id, mr.status, 
+		SELECT
+			mr.id, mr.request_id, mr.hospital_id, mr.facility_id, mr.status,
 			mr.hospital_completed, mr.facility_completed, mr.created_at, mr.updated_at,
 			h.name as hospital_name,
 			f.name as facility_name,
-			pr.patient_age,
-			pr.patient_gender,
-			pr.medical_condition
+			COALESCE(pr.patient_age, 0) as patient_age,
+			COALESCE(pr.patient_gender, '') as patient_gender,
+			COALESCE(pr.medical_condition, '') as medical_condition,
+			COALESCE((
+				SELECT message_text FROM messages
+				WHERE room_id = mr.id
+				ORDER BY created_at DESC
+				LIMIT 1
+			), '') as latest_message,
+			(
+				SELECT created_at FROM messages
+				WHERE room_id = mr.id
+				ORDER BY created_at DESC
+				LIMIT 1
+			) as latest_message_at,
+			EXISTS (
+				SELECT 1 FROM messages m
+				LEFT JOIN message_read_status mrs ON mr.id = mrs.room_id AND mrs.user_id = $2
+				WHERE m.room_id = mr.id
+				AND m.sender_id != $2
+				AND (mrs.last_read_at IS NULL OR m.created_at > mrs.last_read_at)
+			) as has_unread
 		FROM message_rooms mr
 		JOIN hospitals h ON mr.hospital_id = h.id
 		JOIN facilities f ON mr.facility_id = f.id
-		JOIN placement_requests pr ON mr.request_id = pr.id
+		LEFT JOIN placement_requests pr ON mr.request_id = pr.id
 		WHERE mr.hospital_id = $1
-		ORDER BY mr.created_at DESC
+		ORDER BY COALESCE((SELECT created_at FROM messages WHERE room_id = mr.id ORDER BY created_at DESC LIMIT 1), mr.created_at) DESC
 	`
-	rows, err := db.Query(query, hospitalID)
+	rows, err := db.Query(query, hospitalID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var rooms []*MessageRoom
 	for rows.Next() {
 		room := &MessageRoom{}
+		var latestMessageAt sql.NullTime
 		err := rows.Scan(
 			&room.ID,
 			&room.RequestID,
@@ -134,43 +173,69 @@ func GetMessageRoomsByHospitalID(db *sql.DB, hospitalID int) ([]*MessageRoom, er
 			&room.PatientAge,
 			&room.PatientGender,
 			&room.MedicalCondition,
+			&room.LatestMessage,
+			&latestMessageAt,
+			&room.HasUnread,
 		)
 		if err != nil {
 			return nil, err
 		}
+		if latestMessageAt.Valid {
+			room.LatestMessageAt = &latestMessageAt.Time
+		}
 		rooms = append(rooms, room)
 	}
-	
+
 	return rooms, rows.Err()
 }
 
-// GetMessageRoomsByFacilityID retrieves all message rooms for a facility
-func GetMessageRoomsByFacilityID(db *sql.DB, facilityID int) ([]*MessageRoom, error) {
+// GetMessageRoomsByFacilityID retrieves all message rooms for a facility with latest message and unread status
+func GetMessageRoomsByFacilityID(db *sql.DB, facilityID int, userID int) ([]*MessageRoom, error) {
 	query := `
-		SELECT 
-			mr.id, mr.request_id, mr.hospital_id, mr.facility_id, mr.status, 
+		SELECT
+			mr.id, mr.request_id, mr.hospital_id, mr.facility_id, mr.status,
 			mr.hospital_completed, mr.facility_completed, mr.created_at, mr.updated_at,
 			h.name as hospital_name,
 			f.name as facility_name,
-			pr.patient_age,
-			pr.patient_gender,
-			pr.medical_condition
+			COALESCE(pr.patient_age, 0) as patient_age,
+			COALESCE(pr.patient_gender, '') as patient_gender,
+			COALESCE(pr.medical_condition, '') as medical_condition,
+			COALESCE((
+				SELECT message_text FROM messages
+				WHERE room_id = mr.id
+				ORDER BY created_at DESC
+				LIMIT 1
+			), '') as latest_message,
+			(
+				SELECT created_at FROM messages
+				WHERE room_id = mr.id
+				ORDER BY created_at DESC
+				LIMIT 1
+			) as latest_message_at,
+			EXISTS (
+				SELECT 1 FROM messages m
+				LEFT JOIN message_read_status mrs ON mr.id = mrs.room_id AND mrs.user_id = $2
+				WHERE m.room_id = mr.id
+				AND m.sender_id != $2
+				AND (mrs.last_read_at IS NULL OR m.created_at > mrs.last_read_at)
+			) as has_unread
 		FROM message_rooms mr
 		JOIN hospitals h ON mr.hospital_id = h.id
 		JOIN facilities f ON mr.facility_id = f.id
-		JOIN placement_requests pr ON mr.request_id = pr.id
+		LEFT JOIN placement_requests pr ON mr.request_id = pr.id
 		WHERE mr.facility_id = $1
-		ORDER BY mr.created_at DESC
+		ORDER BY COALESCE((SELECT created_at FROM messages WHERE room_id = mr.id ORDER BY created_at DESC LIMIT 1), mr.created_at) DESC
 	`
-	rows, err := db.Query(query, facilityID)
+	rows, err := db.Query(query, facilityID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var rooms []*MessageRoom
 	for rows.Next() {
 		room := &MessageRoom{}
+		var latestMessageAt sql.NullTime
 		err := rows.Scan(
 			&room.ID,
 			&room.RequestID,
@@ -186,13 +251,19 @@ func GetMessageRoomsByFacilityID(db *sql.DB, facilityID int) ([]*MessageRoom, er
 			&room.PatientAge,
 			&room.PatientGender,
 			&room.MedicalCondition,
+			&room.LatestMessage,
+			&latestMessageAt,
+			&room.HasUnread,
 		)
 		if err != nil {
 			return nil, err
 		}
+		if latestMessageAt.Valid {
+			room.LatestMessageAt = &latestMessageAt.Time
+		}
 		rooms = append(rooms, room)
 	}
-	
+
 	return rooms, rows.Err()
 }
 
